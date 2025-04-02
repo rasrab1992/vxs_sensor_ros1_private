@@ -19,16 +19,13 @@ endif()
 
 find_package (catkin REQUIRED COMPONENTS
    roscpp
+   roslib
    rospy
    std_msgs
    cv_bridge
    image_transport
    sensor_msgs
    tf
-   message_generation
-   nodelet
-   orb_slam2
-   poser_msgs
    pcl_conversions
 )
 
@@ -58,24 +55,26 @@ endif()
 catkin_package (
   CATKIN_DEPENDS 
 	roscpp 
+  roslib
 	rospy 
 	std_msgs 
 	cv_bridge 
 	image_transport 
 	sensor_msgs
 	tf
-  message_runtime
-  nodelet
-  orb_slam2
   pcl_conversions
 )
 
-
-list(APPEND VXS_NODE_INCLUDE_DIRS 
+include_directories(${catkin_INCLUDE_DIRS})
+set(VXS_NODE_INCLUDE_DIRS 
   ${CMAKE_CURRENT_SOURCE_DIR}/src
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/publisher
   ${EXT_NODE_INCLUDE_DIRS})
 
-include_directories(${VXS_NODE_INCLUDE_DIRS})
+  catkin_package(
+    INCLUDE_DIRS ${VXS_NODE_INCLUDE_DIRS}
+  )
+
 set(VXS_NODE_SOURCES 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/common.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/publisher/vxs_node.cpp
@@ -83,16 +82,30 @@ set(VXS_NODE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/publisher/vxs_node_main.cpp)
 
 add_executable(vxs_node ${VXS_NODE_SOURCES})
+target_include_directories(vxs_node PUBLIC ${VXS_NODE_INCLUDE_DIRS})
 target_link_libraries(vxs_node ${OTHER_LIBS})
+add_dependencies(vxs_node 
+${${PROJECT_NAME}_EXPORTED_TARGETS}
+${catkin_EXPORTED_TARGETS}
+)
 
-SET(VXS_CPP_SUB_SOURCES 
+
+
+set(VXS_SUB_INCLUDE_DIRS
+  ${CMAKE_CURRENT_SOURCE_DIR}/src
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/subscriber
+  ${EXT_NODE_INCLUDE_DIRS}
+)
+
+set(VXS_SUB_SOURCES 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/common.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/subscriber/vxs_subscriber.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/subscriber/vxs_subscriber.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/subscriber/vxs_subscriber_main.cpp)
 
-add_executable(vxs_cpp_subscriber ${VXS_CPP_SUB_SOURCES})
-target_link_libraries(vxs_cpp_subscriber ${OTHER_LIBS})
+#add_executable(vxs_cpp_subscriber ${VXS_SUB_SOURCES})
+#target_include_directories(vxs_cpp_subscriber PUBLIC ${VXS_SUB_INCLUDE_DIRS})
+#target_link_libraries(vxs_cpp_subscriber ${OTHER_LIBS})
 
 
 #install(TARGETS

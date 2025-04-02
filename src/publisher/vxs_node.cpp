@@ -4,12 +4,14 @@
 #include "publisher/vxs_node.hpp"
 #include "common.hpp"
 
-namespace vxs_ros
+#include <cv_bridge/cv_bridge.h>
+#include <sensor_msgs/image_encodings.h>
+
+namespace vxs_ros1
 {
     VxsSensorPublisher::VxsSensorPublisher(const ros::NodeHandle &nh,
                                            const ros::NodeHandle &nhp) : nh_(nh),                        //
                                                                          nhp_(nhp),                      //
-                                                                         Node("vxs_publisher"),          //
                                                                          frame_polling_thread_(nullptr), //
                                                                          depth_publisher_(nullptr),      //
                                                                          cam_info_publisher_(nullptr),   //
@@ -17,11 +19,11 @@ namespace vxs_ros
                                                                          evcloud_publisher_(nullptr),    //
                                                                          flag_shutdown_request_(false)
     {
-        std::string package_directory = ros::package::getPath('vxs_sensor_ros1');
+        std::string package_directory = ros::package::getPath("vxs_sensor_ros1");
         ROS_INFO_STREAM("Package directory: " << package_directory);
         // Declare & Get parameters
         nhp.param<bool>("publish_depth_image", publish_depth_image_, true);
-        nhp.param<bool>("publish_pcloud", publish_pcloud_, true);
+        nhp.param<bool>("publish_pcloud", publish_pointcloud_, true);
         nhp.param<bool>("publish_events", publish_events_, false);
         nhp.param<int>("fps", fps_, true);
         period_ = std::lround(1000.0f / fps_); // period in ms (will be used in initialization if streaming events)
@@ -31,7 +33,7 @@ namespace vxs_ros
 
         // Print param values
         ROS_INFO_STREAM("Publish depth image: " << (publish_depth_image_ ? "YES." : "NO."));
-        ROS_INFO_STREAM("Publish pointcloud: " << (publish_pcloud_ ? "YES." : "NO."));
+        ROS_INFO_STREAM("Publish pointcloud: " << (publish_pointcloud_ ? "YES." : "NO."));
         ROS_INFO_STREAM("Publish stamped point cloud: " << (publish_events_ ? "YES." : "NO."));
         ROS_INFO_STREAM("FPS: " << fps_ << " and period in ms: " << period_);
         ROS_INFO_STREAM("Config JSON: " << config_json_);
@@ -51,25 +53,25 @@ namespace vxs_ros
         if (!publish_pointcloud_ && !publish_depth_image_)
         {
             publish_depth_image_ = true;
-            ROS_INFO_STREAM("Both pointrcloud and depth image disabled. Depth image will be published.");
+            ROS_INFO_STREAM("Both pointcloud and depth image disabled. Depth image will be published.");
         }
 
         // Create publishers
         depth_publisher_ = nullptr;
         if (publish_depth_image_ && !publish_events_)
         {
-            depth_publisher_ = nhp_.advertise<sensor_msgs::Image>("depth/image", 10);
+            depth_publisher_ = std::make_shared<ros::Publisher>(nhp_.advertise<sensor_msgs::Image>("depth/image", 10));
         }
 
         pcloud_publisher_ = nullptr;
         if (publish_pointcloud_ && !publish_events_)
         {
-            pcloud_publisher_ = nhp_.advertise<sensor_msgs::PointCloud2>("pcloud/cloud", 10);
+            pcloud_publisher_ = std::make_shared<ros::Publisher>(nhp_.advertise<sensor_msgs::PointCloud2>("pcloud/cloud", 10));
         }
 
-        evcloud_publisher_ = publish_events_ ? this->create_publisher<sensor_msgs::msg::PointCloud2>("pcloud/events", 10) : nullptr;
+        evcloud_publisher_ = publish_events_ ? std::make_shared<ros::Publisher>(nhp_.advertise<sensor_msgs::PointCloud2>("pcloud/events", 10)) : nullptr;
 
-        cam_info_publisher_ = this->create_publisher<sensor_msgs::msg::CameraInfo>("sensor/camera_info", 10);
+        cam_info_publisher_ = std::make_shared<ros::Publisher>(nhp_.advertise<sensor_msgs::CameraInfo>("sensor/camera_info", 10));
         // Initialize & start polling thread
         ROS_INFO_STREAM("Starting publisher thread...");
         frame_polling_thread_ = std::make_shared<std::thread>(std::bind(&VxsSensorPublisher::FramePollingLoop, this));
@@ -226,11 +228,8 @@ namespace vxs_ros
 
     void VxsSensorPublisher::PublishDepthImage(const cv::Mat &depth_image)
     {
-        // cv_bridge::CvImagePtr cv_ptr;
-        //  NOTE: See http://docs.ros.org/en/lunar/api/cv_bridge/html/c++/cv__bridge_8cpp_source.html
-        //        for image encoding constants in cv_bridge
         cv_bridge::CvImage cv_image(              //
-            depth_header,                         //
+            std_msgs::Header(),                   //
             sensor_msgs::image_encodings::MONO16, //
             depth_image);
         sensor_msgs::Image depth_image_msg = *cv_image.toImageMsg();
@@ -266,7 +265,7 @@ namespace vxs_ros
                           cams_[0].K(2, 0), cams_[0].K(2, 1), cams_[0].K(2, 2)};
         // publish depth image and camera info
         depth_publisher_->publish(depth_image_msg);
-        cam_info_publisher_->publish(cam_infpo_msg);
+        cam_info_publisher_->publish(cam_info_msg);
     }
 
     void VxsSensorPublisher::PublishPointcloud(const std::vector<cv::Vec3f> &points)

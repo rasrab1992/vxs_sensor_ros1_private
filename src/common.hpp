@@ -12,7 +12,7 @@
 
 #include <SDK2.h>
 
-namespace vxs_ros
+namespace vxs_ros1
 {
     struct CameraCalibration
     {

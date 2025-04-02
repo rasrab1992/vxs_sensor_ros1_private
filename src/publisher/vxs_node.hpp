@@ -21,7 +21,10 @@
 
 #include <ros/ros.h>
 #include <ros/package.h>
+#include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/PointField.h>
 
 #include <opencv2/core.hpp>
 #include <opencv2/opencv.hpp>
@@ -41,7 +44,7 @@ namespace vxs_ros1
         static const int SENSOR_WIDTH = 300;
         static const int SENSOR_HEIGHT = 300;
 
-        VxsSensorPublisher();
+        VxsSensorPublisher(const ros::NodeHandle &nh, const ros::NodeHandle &nhp);
         ~VxsSensorPublisher();
 
     private:
