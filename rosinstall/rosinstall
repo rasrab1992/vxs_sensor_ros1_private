@@ -19,3 +19,6 @@
     version: kinetic-devel}
 - git: {local-name: realsense-ros, uri: 'https://github.com/IntelRealSense/realsense-ros.git',
     version: ros1-legacy}
+- git: {local-name: vxs_sensor_ros1, uri: 'https://github.com/VoxelSensors/vxs_sensor_ros1.git',
+    version: master}
+    
