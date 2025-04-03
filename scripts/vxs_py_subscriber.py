@@ -7,75 +7,48 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 # Import ros stuff
-import rclpy
-from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
-from rclpy.executors import MultiThreadedExecutor
-from rclpy.callback_groups import MutuallyExclusiveCallbackGroup, ReentrantCallbackGroup
+import rospy
 
 from sensor_msgs.msg import PointCloud2, PointField
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import CameraInfo
-from cv_bridge import CvBridge, CvBridgeError
 
 # OpenCV
 import cv2
+from cv_bridge import CvBridge, CvBridgeError
 
 
-class VxsSensorSubscriber(Node):
+class VxsSensorSubscriber:
 
     def __init__(self):
-        super().__init__("vxs_py_subscriber")
         self.K = None
 
         # Calibration subscriber
-        camera_info_CB_group = MutuallyExclusiveCallbackGroup()
-        self.calibration_sub = self.create_subscription(
-            CameraInfo,
-            "/sensor/camera_info",
-            self.CameraInfoCB,
-            qos_profile=1,
-            callback_group=camera_info_CB_group,
+        self.calibration_sub = rospy.Subscriber(
+            "/sensor/camera_info", CameraInfo, self.CameraInfoCB
         )
 
         # Depth image subscriber
         self.bridge = CvBridge()
-        depth_image_CB_group = MutuallyExclusiveCallbackGroup()
-        self.image_sub = self.create_subscription(
-            Image,
-            "/depth/image",
-            self.DepthCB,
-            qos_profile=1,
-            callback_group=depth_image_CB_group,
-        )
+        self.image_sub = rospy.Subscriber("/depth/image", Image, self.DepthCB)
 
         # Pointcloud subscriber
-        pcloud_CB_group = MutuallyExclusiveCallbackGroup()
-        self.pointcloud_sub = self.create_subscription(
-            PointCloud2,
-            "/pcloud/cloud",
-            self.PointcloudCB,
-            qos_profile=10,
-            callback_group=pcloud_CB_group,
+        self.pointcloud_sub = rospy.Subscriber(
+            "/pcloud/cloud", PointCloud2, self.PointcloudCB
         )
 
         # Timestamped pointcloud (events as 3D XYZT points) subscriber
-        evcloud_CB_group = MutuallyExclusiveCallbackGroup()
-        self.pointcloud_sub = self.create_subscription(
-            PointCloud2,
-            "/pcloud/events",
-            self.StampedPointcloudCB,
-            qos_profile=10,
-            callback_group=evcloud_CB_group,
+        self.pointcloud_sub = rospy.Subscriber(
+            "/pcloud/events", PointCloud2, self.StampedPointcloudCB
         )
 
     def CameraInfoCB(self, cam_info_msg):
-        if self.k is not None:
+        if self.K is not None:
             return
-        self.K = np.array(cam_info_msg.k, dtype=np.float32).reshape(3, 3)
-        self.P = np.array(cam_info_msg.p, dtype=np.float(32)).reshape(3, 4)
-        self.R = np.array(cam_info_msg.r, dtype=np.float(32)).reshape(3, 3)
-        self.d = np.array(cam_info_msg.d, dtype=np.float(32))
+        self.K = np.array(cam_info_msg.K, dtype=np.float32).reshape(3, 3)
+        self.P = np.array(cam_info_msg.P, dtype=np.float(32)).reshape(3, 4)
+        self.R = np.array(cam_info_msg.R, dtype=np.float(32)).reshape(3, 3)
+        self.d = np.array(cam_info_msg.D, dtype=np.float(32))
         print("Calibration acquired!")
 
     def DepthCB(self, depth_img_msg):
@@ -234,15 +207,14 @@ def _get_struct_fmt(is_bigendian, fields, field_names=None):
 
 
 def main(args):
-    rclpy.init(args=args)
+    print("INITIALIZING SUBSCRIBER NODE!")
+
+    rospy.init_node("vxs_py_subscriber", anonymous=True)
     ic = VxsSensorSubscriber()
 
-    try:
-        rclpy.spin(ic)
-    except KeyboardInterrupt:
-        print("Shutting down... exiting")
-    ic.destroy_node()
-    rclpy.shutdown()
+    rospy.spin()
+    print("Shutting down... exiting")
+    rospy.shutdown()
     cv2.destroyAllWindows()
 
 

@@ -89,7 +89,10 @@ ${${PROJECT_NAME}_EXPORTED_TARGETS}
 ${catkin_EXPORTED_TARGETS}
 )
 
-
+# Install python script
+catkin_install_python(PROGRAMS scripts/vxs_py_subscriber.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
 
 set(VXS_SUB_INCLUDE_DIRS
   ${CMAKE_CURRENT_SOURCE_DIR}/src
