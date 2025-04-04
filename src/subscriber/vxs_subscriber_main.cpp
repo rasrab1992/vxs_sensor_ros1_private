@@ -2,8 +2,16 @@
 
 int main(int argc, char *argv[])
 {
-    rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<vxs_ros::VxsSensorSubscriber>());
-    rclcpp::shutdown();
+    ros::init(argc, argv, "vxs_publisher");
+    ros::NodeHandle nh;
+    ros::NodeHandle nhp("~");
+
+    vxs_ros1::VxsSensorSubscriber vxs_subscriber(nh, nhp);
+
+    // Now spin ...
+    ros::AsyncSpinner spinner(0);
+    spinner.start();
+    ros::waitForShutdown();
+
     return 0;
 }

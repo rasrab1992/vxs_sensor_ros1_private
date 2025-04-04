@@ -4,40 +4,48 @@
 #include "common.hpp"
 #include "subscriber/vxs_subscriber.hpp"
 
+#include <cv_bridge/cv_bridge.h>
+#include <sensor_msgs/image_encodings.h>
+
 #include <pcl_conversions/pcl_conversions.h> // For converting between ROS and PCL types
-namespace vxs_ros
+
+namespace vxs_ros1
 {
-    VxsSensorSubscriber::VxsSensorSubscriber() : Node("vxs_cpp_subscriber"), cam_(nullptr)
+    VxsSensorSubscriber::VxsSensorSubscriber(const ros::NodeHandle &nh, const ros::NodeHandle &nhp) : nh_(nh), nhp_(nhp), cam_(nullptr)
     {
-        cam_info_subscriber_ = this->create_subscription<sensor_msgs::msg::CameraInfo>( //
-            "/sensor/camera_info",                                                      //
-            10,                                                                         //
-            std::bind(&VxsSensorSubscriber::CameraInfoCB, this, std::placeholders::_1)  //
-        );
-        depth_subscriber_ = this->create_subscription<sensor_msgs::msg::Image>(        //
-            "/depth/image",                                                            //
-            5,                                                                         //
-            std::bind(&VxsSensorSubscriber::DepthImageCB, this, std::placeholders::_1) //
-        );
+        cam_info_subscriber_ = std::make_shared<ros::Subscriber>( //
+            nh_.subscribe(                                        //
+                "/sensor/camera_info",                            //
+                10,                                               //
+                &VxsSensorSubscriber::CameraInfoCB,               //
+                this));
+        depth_subscriber_ = std::make_shared<ros::Subscriber>( //
+            nh_.subscribe(                                     //
+                "/depth/image",                                //
+                5,                                             //
+                &VxsSensorSubscriber::DepthImageCB,            //
+                this));
 
-        pcloud_subscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>( //
-            "/pcloud/cloud",                                                           //
-            5,                                                                         //
-            std::bind(&VxsSensorSubscriber::PointcloudCB, this, std::placeholders::_1) //
-        );
+        pcloud_subscriber_ = std::make_shared<ros::Subscriber>( //
+            nh_.subscribe(                                      //
+                "/pcloud/cloud",                                //
+                5,                                              //
+                &VxsSensorSubscriber::PointcloudCB,             //
+                this));
 
-        evcloud_subscriber_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(       //
-            "/pcloud/events",                                                                 //
-            5,                                                                                //
-            std::bind(&VxsSensorSubscriber::StampedPointcloudCB, this, std::placeholders::_1) //
-        );
+        evcloud_subscriber_ = std::make_shared<ros::Subscriber>( //
+            nh_.subscribe(                                       //
+                "/pcloud/events",                                //
+                5,                                               //
+                &VxsSensorSubscriber::StampedPointcloudCB,       //
+                this));
     }
 
     VxsSensorSubscriber::~VxsSensorSubscriber()
     {
     }
 
-    void VxsSensorSubscriber::CameraInfoCB(const sensor_msgs::msg::CameraInfo::SharedPtr camera_info_msg)
+    void VxsSensorSubscriber::CameraInfoCB(const sensor_msgs::CameraInfo::ConstPtr &camera_info_msg)
     {
         if (!cam_)
         {
@@ -46,22 +54,22 @@ namespace vxs_ros
             {
                 for (size_t c = 0; c < 3; c++)
                 {
-                    cam_->K(r, c) = static_cast<float>(camera_info_msg->k[r * 3 + c]);
-                    cam_->R(r, c) = static_cast<float>(camera_info_msg->r[r * 3 + c]);
-                    cam_->P(r, c) = static_cast<float>(camera_info_msg->p[r * 4 + c]);
+                    cam_->K(r, c) = static_cast<float>(camera_info_msg->K[r * 3 + c]);
+                    cam_->R(r, c) = static_cast<float>(camera_info_msg->R[r * 3 + c]);
+                    cam_->P(r, c) = static_cast<float>(camera_info_msg->P[r * 4 + c]);
                 }
-                cam_->K(r, 3) = static_cast<float>(camera_info_msg->p[r * 4 + 3]);
+                cam_->K(r, 3) = static_cast<float>(camera_info_msg->P[r * 4 + 3]);
             }
 
             for (size_t c = 0; c < 4; c++)
             {
-                cam_->dist[c] = static_cast<float>(camera_info_msg->d[c]);
+                cam_->dist[c] = static_cast<float>(camera_info_msg->D[c]);
             }
-            RCLCPP_INFO_STREAM(this->get_logger(), "Camera parameters acquired.");
+            ROS_INFO_STREAM("Camera parameters acquired.");
         }
     }
 
-    void VxsSensorSubscriber::DepthImageCB(const sensor_msgs::msg::Image::SharedPtr depth_img_msg)
+    void VxsSensorSubscriber::DepthImageCB(const sensor_msgs::Image::ConstPtr &depth_img_msg)
     {
         try
         {
@@ -71,23 +79,22 @@ namespace vxs_ros
         }
         catch (const cv_bridge::Exception &e)
         {
-            // auto logger = rclcpp::get_logger("my_subscriber");
-            RCLCPP_ERROR(this->get_logger(), "Could not convert from '%s' to 'mono16'.", depth_img_msg->encoding.c_str());
+            ROS_ERROR_STREAM("Could not convert from " << depth_img_msg->encoding.c_str() << " to 'mono16'.");
         }
     }
 
-    void VxsSensorSubscriber::PointcloudCB(const sensor_msgs::msg::PointCloud2::SharedPtr pcl_msg)
+    void VxsSensorSubscriber::PointcloudCB(const sensor_msgs::PointCloud2::ConstPtr &pcl_msg)
     {
         std::vector<cv::Vec3f> points;
         // const uint32_t row_step = pcl_msg->row_step;
 
         const uint32_t width = pcl_msg->width;
         const uint32_t height = pcl_msg->height;
-        uint8_t *data_ptr = &pcl_msg->data[0];
+        const uint8_t *data_ptr = &pcl_msg->data[0];
 
-        sensor_msgs::msg::PointField x_field = pcl_msg->fields[0];
-        sensor_msgs::msg::PointField y_field = pcl_msg->fields[1];
-        sensor_msgs::msg::PointField z_field = pcl_msg->fields[2];
+        sensor_msgs::PointField x_field = pcl_msg->fields[0];
+        sensor_msgs::PointField y_field = pcl_msg->fields[1];
+        sensor_msgs::PointField z_field = pcl_msg->fields[2];
         // Point field datatypes. Pointrcloud can be either FLOAT32 or FLOAT64
         // uint8 FLOAT32 = 7
         // uint8 FLOAT64 = 8
@@ -107,30 +114,30 @@ namespace vxs_ros
                 if (std::isfinite(x) && std::isfinite(y) && std::isfinite(z))
                 {
                     points.emplace_back(static_cast<float>(x), static_cast<float>(y), static_cast<float>(z));
-                    RCLCPP_INFO_STREAM(this->get_logger(), "Point: (" << x << ", " << y << ", " << z << ")");
+                    ROS_INFO_STREAM("Point: (" << x << ", " << y << ", " << z << ")");
                 }
                 else
                 {
-                    RCLCPP_ERROR(this->get_logger(), "Invalid point read!");
+                    ROS_ERROR_STREAM("Invalid point read!");
                 }
                 data_ptr += size_of_fields;
             }
         }
     }
 
-    void VxsSensorSubscriber::StampedPointcloudCB(const sensor_msgs::msg::PointCloud2::SharedPtr pcl_msg)
+    void VxsSensorSubscriber::StampedPointcloudCB(const sensor_msgs::PointCloud2::ConstPtr &pcl_msg)
     {
         std::vector<vxsdk::vxXYZT> points;
         // const uint32_t row_step = pcl_msg->row_step;
 
         const uint32_t width = pcl_msg->width;
         const uint32_t height = pcl_msg->height;
-        uint8_t *data_ptr = &pcl_msg->data[0];
+        const uint8_t *data_ptr = &pcl_msg->data[0];
 
-        sensor_msgs::msg::PointField x_field = pcl_msg->fields[0];
-        sensor_msgs::msg::PointField y_field = pcl_msg->fields[1];
-        sensor_msgs::msg::PointField z_field = pcl_msg->fields[2];
-        sensor_msgs::msg::PointField t_field = pcl_msg->fields[3];
+        sensor_msgs::PointField x_field = pcl_msg->fields[0];
+        sensor_msgs::PointField y_field = pcl_msg->fields[1];
+        sensor_msgs::PointField z_field = pcl_msg->fields[2];
+        sensor_msgs::PointField t_field = pcl_msg->fields[3];
 
         // Point field datatypes. Pint coords are either FLOAT32 or FLOAT64. Timestamp is FLOAT64 (which is converted to long long)
         const uint32_t field1_size = (x_field.datatype == 7 ? sizeof(float) : sizeof(double));
@@ -151,11 +158,11 @@ namespace vxs_ros
                 if (std::isfinite(x) && std::isfinite(y) && std::isfinite(z))
                 {
                     points.emplace_back(static_cast<float>(x), static_cast<float>(y), static_cast<float>(z), stamp);
-                    RCLCPP_INFO_STREAM(this->get_logger(), "Point (x, y, z, t): (" << x << ", " << y << ", " << z << ", " << stamp << ")");
+                    ROS_INFO_STREAM("Point (x, y, z, t): (" << x << ", " << y << ", " << z << ", " << stamp << ")");
                 }
                 else
                 {
-                    RCLCPP_ERROR(this->get_logger(), "Invalid point read!");
+                    ROS_ERROR_STREAM("Invalid point read!");
                 }
                 data_ptr += size_of_fields;
             }

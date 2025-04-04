@@ -85,8 +85,8 @@ add_executable(vxs_node ${VXS_NODE_SOURCES})
 target_include_directories(vxs_node PUBLIC ${VXS_NODE_INCLUDE_DIRS})
 target_link_libraries(vxs_node ${OTHER_LIBS})
 add_dependencies(vxs_node 
-${${PROJECT_NAME}_EXPORTED_TARGETS}
-${catkin_EXPORTED_TARGETS}
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
 )
 
 # Install python script
@@ -106,9 +106,13 @@ set(VXS_SUB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/subscriber/vxs_subscriber.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/subscriber/vxs_subscriber_main.cpp)
 
-#add_executable(vxs_cpp_subscriber ${VXS_SUB_SOURCES})
-#target_include_directories(vxs_cpp_subscriber PUBLIC ${VXS_SUB_INCLUDE_DIRS})
-#target_link_libraries(vxs_cpp_subscriber ${OTHER_LIBS})
+add_executable(vxs_cpp_subscriber ${VXS_SUB_SOURCES})
+target_include_directories(vxs_cpp_subscriber PUBLIC ${VXS_SUB_INCLUDE_DIRS})
+target_link_libraries(vxs_cpp_subscriber ${OTHER_LIBS})
+add_dependencies(vxs_cpp_subscriber 
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+)
 
 
 #install(TARGETS

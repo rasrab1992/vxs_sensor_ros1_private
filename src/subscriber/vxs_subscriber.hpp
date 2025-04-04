@@ -10,34 +10,29 @@
 #ifndef VXS_SUBSCRIBER_HPP
 #define VXS_SUBSCRIBER_HPP
 
-#include <condition_variable>
 #include <memory>
 #include <thread>
 #include <string>
+#include <thread>
+#include <mutex>
 
-#include <ament_index_cpp/get_package_share_directory.hpp>
-#include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/string.hpp"
-#include "sensor_msgs/msg/image.hpp"
-#include "sensor_msgs/msg/camera_info.hpp"
-#include "sensor_msgs/msg/point_cloud2.hpp"
-#include <cv_bridge/cv_bridge.h>
+#include <ros/ros.h>
+#include <ros/package.h>
+#include <sensor_msgs/Image.h>
+#include <sensor_msgs/CameraInfo.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/PointField.h>
 
-#include <ament_index_cpp/get_package_share_directory.hpp>
-
-#include "rclcpp/logging.hpp"
-#include "rclcpp/rclcpp.hpp"
-
-#include <opencv2/opencv.hpp>
 #include <opencv2/core.hpp>
+#include <opencv2/opencv.hpp>
 
 using namespace std::chrono_literals;
 
-namespace vxs_ros
+namespace vxs_ros1
 {
     struct CameraCalibration;
 
-    class VxsSensorSubscriber : public rclcpp::Node
+    class VxsSensorSubscriber
     {
 
     public:
@@ -45,22 +40,25 @@ namespace vxs_ros
         static const int SENSOR_WIDTH = 300;
         static const int SENSOR_HEIGHT = 300;
 
-        VxsSensorSubscriber();
+        VxsSensorSubscriber(const ros::NodeHandle &nh, const ros::NodeHandle &nhp);
         ~VxsSensorSubscriber();
 
     private:
-        rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_subscriber_;
-        rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr cam_info_subscriber_;
-        rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pcloud_subscriber_;
-        rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr evcloud_subscriber_;
+        ros::NodeHandle nh_;
+        ros::NodeHandle nhp_;
+
+        std::shared_ptr<ros::Subscriber> depth_subscriber_;
+        std::shared_ptr<ros::Subscriber> cam_info_subscriber_;
+        std::shared_ptr<ros::Subscriber> pcloud_subscriber_;
+        std::shared_ptr<ros::Subscriber> evcloud_subscriber_;
 
         //! Camera #1 calibration
         std::shared_ptr<CameraCalibration> cam_;
 
-        void CameraInfoCB(const sensor_msgs::msg::CameraInfo::SharedPtr camera_info_msg);
-        void DepthImageCB(const sensor_msgs::msg::Image::SharedPtr depth_img_msg);
-        void PointcloudCB(const sensor_msgs::msg::PointCloud2::SharedPtr depth_img_msg);
-        void StampedPointcloudCB(const sensor_msgs::msg::PointCloud2::SharedPtr pcl_msg);
+        void CameraInfoCB(const sensor_msgs::CameraInfo::ConstPtr &camera_info_msg);
+        void DepthImageCB(const sensor_msgs::Image::ConstPtr &depth_img_msg);
+        void PointcloudCB(const sensor_msgs::PointCloud2::ConstPtr &depth_img_msg);
+        void StampedPointcloudCB(const sensor_msgs::PointCloud2::ConstPtr &pcl_msg);
     };
 
 } // end namespace vxs_ros
