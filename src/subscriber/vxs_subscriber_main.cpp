@@ -2,7 +2,7 @@
 
 int main(int argc, char *argv[])
 {
-    ros::init(argc, argv, "vxs_publisher");
+    ros::init(argc, argv, "vxs_subscriber");
     ros::NodeHandle nh;
     ros::NodeHandle nhp("~");
 

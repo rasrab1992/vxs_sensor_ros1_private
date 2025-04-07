@@ -30,16 +30,18 @@ class VxsSensorSubscriber:
 
         # Depth image subscriber
         self.bridge = CvBridge()
-        self.image_sub = rospy.Subscriber("/depth/image", Image, self.DepthCB)
+        self.image_sub = rospy.Subscriber(
+            "/vxs_publisher/depth/image", Image, self.DepthCB
+        )
 
         # Pointcloud subscriber
         self.pointcloud_sub = rospy.Subscriber(
-            "/pcloud/cloud", PointCloud2, self.PointcloudCB
+            "/vxs_publisher/pcloud/cloud", PointCloud2, self.PointcloudCB
         )
 
         # Timestamped pointcloud (events as 3D XYZT points) subscriber
         self.pointcloud_sub = rospy.Subscriber(
-            "/pcloud/events", PointCloud2, self.StampedPointcloudCB
+            "/vxs_publisher/pcloud/events", PointCloud2, self.StampedPointcloudCB
         )
 
     def CameraInfoCB(self, cam_info_msg):
@@ -69,8 +71,8 @@ class VxsSensorSubscriber:
 
         pcd_as_numpy_array = np.array(list(read_points(pcloud_msg)))
 
-        # for pt in pcd_as_numpy_array:
-        #    print(pt)
+        for pt in pcd_as_numpy_array:
+            print(pt)
 
     def StampedPointcloudCB(self, evcloud_msg):
         # Here we convert the 'msg', which is of the type PointCloud2.
@@ -80,12 +82,12 @@ class VxsSensorSubscriber:
         pcd_as_numpy_array = np.array(list(read_points(evcloud_msg)))
 
         # NOTE: The 4th field will be a double that needs to be assigned (bitwise to a 64-bit int)
-        # for pt in pcd_as_numpy_array:
-        #    x = pt[0]
-        #    y = pt[1]
-        #    z = pt[2]
-        #    t = DoubleToInt64(pt[3])
-        #    print(f"(x, y, z, t) = ({x}, {y}, {z}, {t})")
+        for pt in pcd_as_numpy_array:
+            x = pt[0]
+            y = pt[1]
+            z = pt[2]
+            t = DoubleToInt64(pt[3])
+            print(f"(x, y, z, t) = ({x}, {y}, {z}, {t})")
 
 
 def DoubleToInt64(double_value):

@@ -15,27 +15,27 @@ namespace vxs_ros1
     {
         cam_info_subscriber_ = std::make_shared<ros::Subscriber>( //
             nh_.subscribe(                                        //
-                "/sensor/camera_info",                            //
+                "/vxs_publisher/sensor/camera_info",              //
                 10,                                               //
                 &VxsSensorSubscriber::CameraInfoCB,               //
                 this));
         depth_subscriber_ = std::make_shared<ros::Subscriber>( //
             nh_.subscribe(                                     //
-                "/depth/image",                                //
+                "/vxs_publisher/depth/image",                  //
                 5,                                             //
                 &VxsSensorSubscriber::DepthImageCB,            //
                 this));
 
         pcloud_subscriber_ = std::make_shared<ros::Subscriber>( //
             nh_.subscribe(                                      //
-                "/pcloud/cloud",                                //
+                "/vxs_publisher/pcloud/cloud",                  //
                 5,                                              //
                 &VxsSensorSubscriber::PointcloudCB,             //
                 this));
 
         evcloud_subscriber_ = std::make_shared<ros::Subscriber>( //
             nh_.subscribe(                                       //
-                "/pcloud/events",                                //
+                "/vxs_publisher/pcloud/events",                  //
                 5,                                               //
                 &VxsSensorSubscriber::StampedPointcloudCB,       //
                 this));
