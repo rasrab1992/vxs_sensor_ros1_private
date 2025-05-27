@@ -22,7 +22,7 @@ namespace vxs_ros1
         std::string package_directory = ros::package::getPath("vxs_sensor_ros1");
         ROS_INFO_STREAM("Package directory: " << package_directory);
         // Declare & Get parameters
-        nhp.param<bool>("publish_depth_image", publish_depth_image_, true);
+        nhp.param<bool>("publish_depth_image", publish_depth_image_, false);
         nhp.param<bool>("publish_pcloud", publish_pointcloud_, false);
         nhp.param<bool>("publish_events", publish_events_, false);
         nhp.param<int>("fps", fps_, true);
@@ -58,13 +58,6 @@ namespace vxs_ros1
         {
             ROS_ERROR_STREAM("Sensor initialization failed!");
             ros::shutdown();
-        }
-
-        // By default publish depth image
-        if (!publish_pointcloud_ && !publish_depth_image_)
-        {
-            publish_depth_image_ = true;
-            ROS_INFO_STREAM("Both pointcloud and depth image disabled. Depth image will be published.");
         }
 
         // Create publishers
