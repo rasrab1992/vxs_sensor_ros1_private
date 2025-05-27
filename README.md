@@ -129,6 +129,16 @@ Now run the node with the following:
 
 ``rosrun vxs_sensor_ros1 vxs_node _config_json:=/home/vxs/vxs_ws/ros_ws/src/vxs_sensor_ros2/config/and2_median_golden.json _calib_json:=/home/vxs/vxs_ws/ros_ws/src/vxs_sensor_ros2/config/default_calib.json _fps:=20
 
+### ROS publisher node (vxs_node) arguments
+
+- **publish_depth_image (bool)** : Will force the node to initialize **frame-based** communications with the sensor and publish a *depth image* in topic `depth/image`. Note that this arguments will override setting **publish_events** to **true**.
+- **publish_pointcloud (bool)**  : Will force the node to initialize **frame-based** communications with the sensor and publish a *pointcloud* in topic `pcloud/cloud`. It also overrides **publish_events** as above.
+- **publish_events (bool)**      : If **publish_depth_image** or **publish_pointcloud** are not specified then setting this argument to **true** will force the node to initialize communications in **streaming mode** with the sensor. In this communications mode, the nose will publish a **stamped pointcloud** which will represent events (`XYZt`) in 3D space and time between two time instances defined by a a period `1000/fps (ms)` (see below about argument **fps**).      
+- **fps (int)**                  : If using **frame-based mode** (see first two arguments), it specifies the frame-rate. For frame-based mode, then **valid fps values are 1, 15, 30, 60, 90, 180**. Otherwise, if the node is on **streaming mode**, then **fps** can have any positive value and will determine the **period throughout which it will capture events (i.e. `XYZt` data).
+- **config_json (string)**       : The full path to the SDK configuration json.
+- **calib_json (string)**       : The full path to the calibration json.
+
+### Observe topics
 You can now start a new docker window and observe the data in the ros topics published by the node (`/depth/image` and `/depth/camera_info`):
 
 ``rostopic list``
