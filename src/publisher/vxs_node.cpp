@@ -62,13 +62,13 @@ namespace vxs_ros1
 
         // Create publishers
         depth_publisher_ = nullptr;
-        if (publish_depth_image_ && !publish_events_)
+        if (publish_depth_image_)
         {
             depth_publisher_ = std::make_shared<ros::Publisher>(nhp_.advertise<sensor_msgs::Image>("depth/image", 10));
         }
 
         pcloud_publisher_ = nullptr;
-        if (publish_pointcloud_ && !publish_events_)
+        if (publish_pointcloud_)
         {
             pcloud_publisher_ = std::make_shared<ros::Publisher>(nhp_.advertise<sensor_msgs::PointCloud2>("pcloud/cloud", 10));
         }
