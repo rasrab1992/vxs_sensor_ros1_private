@@ -22,19 +22,30 @@ namespace vxs_ros1
         std::string package_directory = ros::package::getPath("vxs_sensor_ros1");
         ROS_INFO_STREAM("Package directory: " << package_directory);
         // Declare & Get parameters
-        nhp.param<bool>("publish_depth_image", publish_depth_image_, true);
-        nhp.param<bool>("publish_pcloud", publish_pointcloud_, true);
+        nhp.param<bool>("publish_depth_image", publish_depth_image_, false);
+        nhp.param<bool>("publish_pcloud", publish_pointcloud_, false);
         nhp.param<bool>("publish_events", publish_events_, false);
         nhp.param<int>("fps", fps_, true);
         period_ = std::lround(1000.0f / fps_); // period in ms (will be used in initialization if streaming events)
+
+        if ((publish_depth_image_ || publish_pcloud_) && publish_events_)
+        {
+            publish_events_ = false;
+            ROS_INFO_STREAM("Both frame based mode (publishe_depth_image or publish_pcloud) and streaming mode (publish_events_) specificied. Disabling streaming mode.");
+        }
+        if (!publish_depth_image && !publish_pcloud && !publish_events_)
+        {
+            publish_depth_image_ = true;
+            ROS_INFO_STREAM("No publishing mode (frame-based or streaming) specified. Switching to frame-based (publish_depth_image).");
+        }
 
         nhp.param<std::string>("config_json", config_json_, "config/and2_median_golden.json");
         nhp.param<std::string>("calib_json", calib_json_, "config/default_calib.json");
 
         // Print param values
-        ROS_INFO_STREAM("Publish depth image: " << (publish_depth_image_ ? "YES." : "NO."));
-        ROS_INFO_STREAM("Publish pointcloud: " << (publish_pointcloud_ ? "YES." : "NO."));
-        ROS_INFO_STREAM("Publish stamped point cloud: " << (publish_events_ ? "YES." : "NO."));
+        ROS_INFO_STREAM("Publish frame-based depth image (publlish_depth_image): " << (publish_depth_image_ ? "YES." : "NO."));
+        ROS_INFO_STREAM("Publish frame-based pointcloud (publish_pcloud): " << (publish_pointcloud_ ? "YES." : "NO."));
+        ROS_INFO_STREAM("Publish streaming based (stamped) point cloud (publish_events): " << (publish_events_ ? "YES." : "NO."));
         ROS_INFO_STREAM("FPS: " << fps_ << " and period in ms: " << period_);
         ROS_INFO_STREAM("Config JSON: " << config_json_);
         ROS_INFO_STREAM("Calibration JSON: " << calib_json_);
@@ -47,13 +58,6 @@ namespace vxs_ros1
         {
             ROS_ERROR_STREAM("Sensor initialization failed!");
             ros::shutdown();
-        }
-
-        // By default publish depth image
-        if (!publish_pointcloud_ && !publish_depth_image_)
-        {
-            publish_depth_image_ = true;
-            ROS_INFO_STREAM("Both pointcloud and depth image disabled. Depth image will be published.");
         }
 
         // Create publishers
