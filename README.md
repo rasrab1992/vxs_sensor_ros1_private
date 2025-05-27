@@ -137,6 +137,8 @@ Now run the node with the following:
 - **fps (int)**                  : If using **frame-based mode** (see first two arguments), it specifies the frame-rate. For frame-based mode, then **valid fps values are 1, 15, 30, 60, 90, 180**. Otherwise, if the node is on **streaming mode**, then **fps** can have any positive value and will determine the **period throughout which it will capture events (i.e. `XYZt` data).
 - **config_json (string)**       : The full path to the SDK configuration json.
 - **calib_json (string)**       : The full path to the calibration json.
+**NOTE**: If none of the three first arguments that determine sensor communication mode are set, then the node will internally set **publish_depth_image** to **true**.
+
 
 ### Observe topics
 You can now start a new docker window and observe the data in the ros topics published by the node (`/depth/image` and `/depth/camera_info`):
