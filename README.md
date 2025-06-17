@@ -136,7 +136,13 @@ Now run the node with the following:
 - **publish_events (bool)**      : If **publish_depth_image** or **publish_pointcloud** are not specified then setting this argument to **true** will force the node to initialize communications in **streaming mode** with the sensor. In this communications mode, the nose will publish a **stamped pointcloud** which will represent events (`XYZt`) in 3D space and time between two time instances defined by a a period `1000/fps (ms)` (see below about argument **fps**).      
 - **fps (int)**                  : If using **frame-based mode** (see first two arguments), it specifies the frame-rate. For frame-based mode, then **valid fps values are 1, 15, 30, 60, 90, 180**. Otherwise, if the node is on **streaming mode**, then **fps** can have any positive value and will determine the **period throughout which it will capture events (i.e. `XYZt` data).
 - **config_json (string)**       : The full path to the SDK configuration json.
-- **calib_json (string)**       : The full path to the calibration json.
+- **calib_json (string)**        : The full path to the calibration json.
+- **binning_amount (int)**              : (Filtering arg. 1). Default: 0
+- **prefiltering_threshold (float)**    : (Filtering arg. 2). Default: 2.0
+- **filterP1 (float)**                  : (Filtering arg. 3). Default: 0.1
+- **temporal_threshold (int)**          : (Filtering arg. 4). Default: 4
+- **spatial_threshold (int)**           : (Filtering arg. 5). Default: 10
+
 **NOTE**: If none of the three first arguments that determine sensor communication mode are set, then the node will internally set **publish_depth_image** to **true**.
 
 
