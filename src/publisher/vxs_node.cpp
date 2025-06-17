@@ -9,6 +9,9 @@
 
 namespace vxs_ros1
 {
+    const float FilteringParams::DEFAULT_PREFILTERING_THRESH = 2.0;
+    const float FilteringParams::DEFAULT_FILTERP1 = 0.1;
+
     VxsSensorPublisher::VxsSensorPublisher(const ros::NodeHandle &nh,
                                            const ros::NodeHandle &nhp) : nh_(nh),                        //
                                                                          nhp_(nhp),                      //
@@ -28,12 +31,12 @@ namespace vxs_ros1
         nhp.param<int>("fps", fps_, true);
         period_ = std::lround(1000.0f / fps_); // period in ms (will be used in initialization if streaming events)
 
-        if ((publish_depth_image_ || publish_pcloud_) && publish_events_)
+        if ((publish_depth_image_ || publish_pointcloud_) && publish_events_)
         {
             publish_events_ = false;
             ROS_INFO_STREAM("Both frame based mode (publishe_depth_image or publish_pcloud) and streaming mode (publish_events_) specificied. Disabling streaming mode.");
         }
-        if (!publish_depth_image && !publish_pcloud && !publish_events_)
+        if (!publish_depth_image_ && !publish_pointcloud_ && !publish_events_)
         {
             publish_depth_image_ = true;
             ROS_INFO_STREAM("No publishing mode (frame-based or streaming) specified. Switching to frame-based (publish_depth_image).");
@@ -41,6 +44,13 @@ namespace vxs_ros1
 
         nhp.param<std::string>("config_json", config_json_, "config/and2_median_golden.json");
         nhp.param<std::string>("calib_json", calib_json_, "config/default_calib.json");
+
+        // Filtering parameters
+        nhp.param<int>("binning_amount", filtering_params_.binning_amount, FilteringParams::DEFAULT_BINNING);
+        nhp.param<float>("prefiltering_threshold", filtering_params_.prefiltering_threshold, FilteringParams::DEFAULT_PREFILTERING_THRESH);
+        nhp.param<float>("filterP1", filtering_params_.filterP1, FilteringParams::DEFAULT_FILTERP1);
+        nhp.param<int>("temporal_threshold", filtering_params_.temporal_threshold, FilteringParams::DEFAULT_TEMPORAL_THRESH);
+        nhp.param<int>("spatial_threshold", filtering_params_.spatial_threshold, FilteringParams::DEFAULT_SPATIAL_THRESH);
 
         // Print param values
         ROS_INFO_STREAM("Publish frame-based depth image (publlish_depth_image): " << (publish_depth_image_ ? "YES." : "NO."));
@@ -111,12 +121,12 @@ namespace vxs_ros1
             vxsdk::vxSetFPS(fps_);
         }
         // Set filtering parameters
-        vxsdk::vxSetBinningAmount(binning_amount_);
-        vxsdk::vxSetFilteringParameters(               //
-            filtering_params_.prefiltering_threshold_, //
-            filtering_params_.filterP1_,               //
-            filtering_params_.temporal_threshold_,     //
-            filtering_params_.spation_threshold_);
+        vxsdk::vxSetBinningAmount(filtering_params_.binning_amount);
+        vxsdk::vxSetFilteringParameters(              //
+            filtering_params_.prefiltering_threshold, //
+            filtering_params_.filterP1,               //
+            filtering_params_.temporal_threshold,     //
+            filtering_params_.spatial_threshold);
 
         // Start the SDK Engine.
         int cam_num = vxsdk::vxStartSystem( //
