@@ -110,6 +110,13 @@ namespace vxs_ros1
             pipeline_type = vxsdk::pipelineType::fbPointcloud;
             vxsdk::vxSetFPS(fps_);
         }
+        // Set filtering parameters
+        vxsdk::vxSetBinningAmount(binning_amount_);
+        vxsdk::vxSetFilteringParameters(               //
+            filtering_params_.prefiltering_threshold_, //
+            filtering_params_.filterP1_,               //
+            filtering_params_.temporal_threshold_,     //
+            filtering_params_.spation_threshold_);
 
         // Start the SDK Engine.
         int cam_num = vxsdk::vxStartSystem( //
