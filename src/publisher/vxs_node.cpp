@@ -26,21 +26,29 @@ namespace vxs_ros1
         ROS_INFO_STREAM("Package directory: " << package_directory);
         // Declare & Get parameters
         nhp.param<bool>("publish_depth_image", publish_depth_image_, false);
-        nhp.param<bool>("publish_pcloud", publish_pointcloud_, false);
+        nhp.param<bool>("publish_pointcloud", publish_pointcloud_, false);
         nhp.param<bool>("publish_events", publish_events_, false);
         nhp.param<int>("fps", fps_, true);
         period_ = std::lround(1000.0f / fps_); // period in ms (will be used in initialization if streaming events)
 
-        if ((publish_depth_image_ || publish_pointcloud_) && publish_events_)
+        if (publish_events_)
         {
-            publish_events_ = false;
-            ROS_INFO_STREAM("Both frame based mode (publishe_depth_image or publish_pcloud) and streaming mode (publish_events_) specificied. Disabling streaming mode.");
+            // Disable both standard pointcloud and depth image publishing
+            publish_depth_image_ = publish_pointcloud_ = false;
+            ROS_INFO_STREAM("Streaming mode (event based) enabled. Disabling depth and standard pointcloud poublishers.\n");
         }
-        if (!publish_depth_image_ && !publish_pointcloud_ && !publish_events_)
+        else
         {
-            publish_depth_image_ = true;
-            ROS_INFO_STREAM("No publishing mode (frame-based or streaming) specified. Switching to frame-based (publish_depth_image).");
+            // Force pointcloud publishing by default if running frame based mode
+            if (!publish_depth_image_ && !publish_pointcloud_)
+            {
+                publish_depth_image_ = true;
+                ROS_INFO_STREAM("Running frame based mode. Enabling pointcloud publisher...\n");
+            }
+            ROS_INFO_STREAM("Pointcloud publisher: " << (publish_pointcloud_ ? "ENABLED." : "DISABLED.") << std::endl);
+            ROS_INFO_STREAM("Depth image publisher: " << (publish_depth_image_ ? "ENABLED." : "DISABLED.") << std::endl);
         }
+        ROS_INFO_STREAM("SDK Mode: " << (publish_events_ ? "STREAM." : "FRAME.") << std::endl);
 
         nhp.param<std::string>("config_json", config_json_, "config/and2_median_golden.json");
         nhp.param<std::string>("calib_json", calib_json_, "config/default_calib.json");
