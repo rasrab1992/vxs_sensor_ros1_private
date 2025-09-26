@@ -1,0 +1,7 @@
+  
+# This service instructs the node that runs the server to set a new observation window
+int32 on_time
+int32 period_time
+---
+bool success          # True if the call succeeded
+string status_message # Used to give details about success

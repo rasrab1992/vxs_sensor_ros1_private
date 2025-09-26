@@ -13,14 +13,20 @@ namespace vxs_ros1
     const float FilteringParams::DEFAULT_FILTERP1 = 0.1;
 
     VxsSensorPublisher::VxsSensorPublisher(const ros::NodeHandle &nh,
-                                           const ros::NodeHandle &nhp) : nh_(nh),                        //
-                                                                         nhp_(nhp),                      //
-                                                                         frame_polling_thread_(nullptr), //
-                                                                         depth_publisher_(nullptr),      //
-                                                                         cam_info_publisher_(nullptr),   //
-                                                                         pcloud_publisher_(nullptr),     //
-                                                                         evcloud_publisher_(nullptr),    //
-                                                                         flag_shutdown_request_(false)
+                                           const ros::NodeHandle &nhp) : nh_(nh),                                                //
+                                                                         nhp_(nhp),                                              //
+                                                                         frame_polling_thread_(nullptr),                         //
+                                                                         depth_publisher_(nullptr),                              //
+                                                                         cam_info_publisher_(nullptr),                           //
+                                                                         pcloud_publisher_(nullptr),                             //
+                                                                         evcloud_publisher_(nullptr),                            //
+                                                                         flag_shutdown_request_(false),                          //
+                                                                         flag_update_observation_window_(false),                 //
+                                                                         observation_window_update_server_(                      //
+                                                                             nhp_.advertiseService(                              //
+                                                                                 "update_observation_window",                    //
+                                                                                 &VxsSensorPublisher::UpdateObservationWindowCB, //
+                                                                                 this))
     {
         std::string package_directory = ros::package::getPath("vxs_sensor_ros1");
         ROS_INFO_STREAM("Package directory: " << package_directory);
@@ -170,7 +176,7 @@ namespace vxs_ros1
                 std::vector<cv::Vec3f> points;
 
                 cv::Mat frame = UnpackFrameSensorData(frameXYZ, points);
-                //   Publish sensor data as a depth image
+                // Publish sensor data as a depth image
                 if (publish_depth_image_)
                 {
                     PublishDepthImage(frame);
@@ -179,6 +185,12 @@ namespace vxs_ros1
                 {
                     PublishPointcloud(points);
                 }
+            }
+            // Check for observation window update
+            if (flag_observation_window)
+            {
+                vxsdk::vxSetObservationWindow(on_time_, period_time_);
+                flag_observation_window = false;
             }
         }
         flag_in_polling_loop_ = false;
