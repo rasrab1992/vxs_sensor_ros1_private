@@ -187,7 +187,7 @@ namespace vxs_ros1
                 }
             }
             // Check for observation window update
-            if (flag_observation_window)
+            if (flag_update_observation_window_)
             {
                 vxsdk::vxSetObservationWindow(on_time_, period_time_);
                 flag_observation_window = false;
@@ -416,4 +416,12 @@ namespace vxs_ros1
         evcloud_publisher_->publish(msg);
     }
 
+    bool VxsSensorPublisher::UpdateObservationWindowCB(
+        vxs_sensor_ros1::UpdateObservationWindow::Request &request,
+        vxs_sensor_ros1::UpdateObservationWindow::Response &result)
+    {
+        on_time_ = request.on_time;
+        period_time_ = request.period_time;
+        flag_update_observation_window_ = true;
+    }
 } // end namespace vxs_ros
