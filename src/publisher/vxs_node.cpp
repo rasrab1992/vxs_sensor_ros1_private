@@ -9,38 +9,62 @@
 
 namespace vxs_ros1
 {
+    const float FilteringParams::DEFAULT_PREFILTERING_THRESH = 2.0;
+    const float FilteringParams::DEFAULT_FILTERP1 = 0.1;
+
     VxsSensorPublisher::VxsSensorPublisher(const ros::NodeHandle &nh,
-                                           const ros::NodeHandle &nhp) : nh_(nh),                        //
-                                                                         nhp_(nhp),                      //
-                                                                         frame_polling_thread_(nullptr), //
-                                                                         depth_publisher_(nullptr),      //
-                                                                         cam_info_publisher_(nullptr),   //
-                                                                         pcloud_publisher_(nullptr),     //
-                                                                         evcloud_publisher_(nullptr),    //
-                                                                         flag_shutdown_request_(false)
+                                           const ros::NodeHandle &nhp) : nh_(nh),                                                //
+                                                                         nhp_(nhp),                                              //
+                                                                         frame_polling_thread_(nullptr),                         //
+                                                                         depth_publisher_(nullptr),                              //
+                                                                         cam_info_publisher_(nullptr),                           //
+                                                                         pcloud_publisher_(nullptr),                             //
+                                                                         evcloud_publisher_(nullptr),                            //
+                                                                         flag_shutdown_request_(false),                          //
+                                                                         flag_update_observation_window_(false),                 //
+                                                                         observation_window_update_server_(                      //
+                                                                             nhp_.advertiseService(                              //
+                                                                                 "update_observation_window",                    //
+                                                                                 &VxsSensorPublisher::UpdateObservationWindowCB, //
+                                                                                 this))
     {
         std::string package_directory = ros::package::getPath("vxs_sensor_ros1");
         ROS_INFO_STREAM("Package directory: " << package_directory);
         // Declare & Get parameters
         nhp.param<bool>("publish_depth_image", publish_depth_image_, false);
-        nhp.param<bool>("publish_pcloud", publish_pointcloud_, false);
+        nhp.param<bool>("publish_pointcloud", publish_pointcloud_, false);
         nhp.param<bool>("publish_events", publish_events_, false);
         nhp.param<int>("fps", fps_, true);
         period_ = std::lround(1000.0f / fps_); // period in ms (will be used in initialization if streaming events)
 
-        if ((publish_depth_image_ || publish_pcloud_) && publish_events_)
+        if (publish_events_)
         {
-            publish_events_ = false;
-            ROS_INFO_STREAM("Both frame based mode (publishe_depth_image or publish_pcloud) and streaming mode (publish_events_) specificied. Disabling streaming mode.");
+            // Disable both standard pointcloud and depth image publishing
+            publish_depth_image_ = publish_pointcloud_ = false;
+            ROS_INFO_STREAM("Streaming mode (event based) enabled. Disabling depth and standard pointcloud poublishers.\n");
         }
-        if (!publish_depth_image && !publish_pcloud && !publish_events_)
+        else
         {
-            publish_depth_image_ = true;
-            ROS_INFO_STREAM("No publishing mode (frame-based or streaming) specified. Switching to frame-based (publish_depth_image).");
+            // Force pointcloud publishing by default if running frame based mode
+            if (!publish_depth_image_ && !publish_pointcloud_)
+            {
+                publish_depth_image_ = true;
+                ROS_INFO_STREAM("Running frame based mode. Enabling pointcloud publisher...\n");
+            }
+            ROS_INFO_STREAM("Pointcloud publisher: " << (publish_pointcloud_ ? "ENABLED." : "DISABLED.") << std::endl);
+            ROS_INFO_STREAM("Depth image publisher: " << (publish_depth_image_ ? "ENABLED." : "DISABLED.") << std::endl);
         }
+        ROS_INFO_STREAM("SDK Mode: " << (publish_events_ ? "STREAM." : "FRAME.") << std::endl);
 
         nhp.param<std::string>("config_json", config_json_, "config/and2_median_golden.json");
         nhp.param<std::string>("calib_json", calib_json_, "config/default_calib.json");
+
+        // Filtering parameters
+        nhp.param<int>("binning_amount", filtering_params_.binning_amount, FilteringParams::DEFAULT_BINNING);
+        nhp.param<float>("prefiltering_threshold", filtering_params_.prefiltering_threshold, FilteringParams::DEFAULT_PREFILTERING_THRESH);
+        nhp.param<float>("filterP1", filtering_params_.filterP1, FilteringParams::DEFAULT_FILTERP1);
+        nhp.param<int>("temporal_threshold", filtering_params_.temporal_threshold, FilteringParams::DEFAULT_TEMPORAL_THRESH);
+        nhp.param<int>("spatial_threshold", filtering_params_.spatial_threshold, FilteringParams::DEFAULT_SPATIAL_THRESH);
 
         // Print param values
         ROS_INFO_STREAM("Publish frame-based depth image (publlish_depth_image): " << (publish_depth_image_ ? "YES." : "NO."));
@@ -110,6 +134,13 @@ namespace vxs_ros1
             pipeline_type = vxsdk::pipelineType::fbPointcloud;
             vxsdk::vxSetFPS(fps_);
         }
+        // Set filtering parameters
+        vxsdk::vxSetBinningAmount(filtering_params_.binning_amount);
+        vxsdk::vxSetFilteringParameters(              //
+            filtering_params_.prefiltering_threshold, //
+            filtering_params_.filterP1,               //
+            filtering_params_.temporal_threshold,     //
+            filtering_params_.spatial_threshold);
 
         // Start the SDK Engine.
         int cam_num = vxsdk::vxStartSystem( //
@@ -145,7 +176,7 @@ namespace vxs_ros1
                 std::vector<cv::Vec3f> points;
 
                 cv::Mat frame = UnpackFrameSensorData(frameXYZ, points);
-                //   Publish sensor data as a depth image
+                // Publish sensor data as a depth image
                 if (publish_depth_image_)
                 {
                     PublishDepthImage(frame);
@@ -154,6 +185,12 @@ namespace vxs_ros1
                 {
                     PublishPointcloud(points);
                 }
+            }
+            // Check for observation window update
+            if (flag_update_observation_window_)
+            {
+                vxsdk::vxSetObservationWindow(on_time_, period_time_);
+                flag_update_observation_window_ = false;
             }
         }
         flag_in_polling_loop_ = false;
@@ -379,4 +416,28 @@ namespace vxs_ros1
         evcloud_publisher_->publish(msg);
     }
 
+    bool VxsSensorPublisher::UpdateObservationWindowCB(
+        vxs_sensor_ros1::UpdateObservationWindow::Request &request,
+        vxs_sensor_ros1::UpdateObservationWindow::Response &result)
+    {
+        if (request.on_time > 10)
+        {
+            result.status_message = "Parameter on_time greater than 10!";
+            result.success = false;
+        }
+        else if (request.period_time < request.on_time)
+        {
+            result.status_message = "Parameter period_time must be greater than on_time!";
+            result.success = false;
+        }
+        else
+        {
+            on_time_ = request.on_time;
+            period_time_ = request.period_time;
+            result.status_message = "vxs_node: Updating observation window...";
+            result.success = true;
+        }
+        flag_update_observation_window_ = true;
+        return true;
+    }
 } // end namespace vxs_ros

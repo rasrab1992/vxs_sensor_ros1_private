@@ -27,6 +27,7 @@ find_package (catkin REQUIRED COMPONENTS
    sensor_msgs
    tf
    pcl_conversions
+   message_generation
 )
 
 list(APPEND OTHER_LIBS
@@ -52,6 +53,17 @@ else()
   message("VXSDK not found!")
 endif()
 
+# Generate services in the 'srv' folder
+add_service_files(
+  FILES
+   UpdateObservationWindow.srv
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
+
 catkin_package (
   CATKIN_DEPENDS 
 	roscpp 
@@ -63,6 +75,7 @@ catkin_package (
 	sensor_msgs
 	tf
   pcl_conversions
+  message_generation
 )
 
 include_directories(${catkin_INCLUDE_DIRS})
