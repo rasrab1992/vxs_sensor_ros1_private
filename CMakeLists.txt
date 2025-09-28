@@ -59,6 +59,11 @@ add_service_files(
    UpdateObservationWindow.srv
 )
 
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
+
 catkin_package (
   CATKIN_DEPENDS 
 	roscpp 

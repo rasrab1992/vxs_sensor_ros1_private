@@ -108,7 +108,7 @@ namespace vxs_ros1
         //! A flag forcing update of the observation window wit the cached values
         std::atomic<bool> flag_update_observation_window_;
         //! observation window parameters
-        int on_time, period_time;
+        int on_time_, period_time_;
 
         //! Camera #1 calibration
         std::vector<CameraCalibration> cams_;

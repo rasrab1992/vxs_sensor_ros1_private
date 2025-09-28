@@ -190,7 +190,7 @@ namespace vxs_ros1
             if (flag_update_observation_window_)
             {
                 vxsdk::vxSetObservationWindow(on_time_, period_time_);
-                flag_observation_window = false;
+                flag_update_observation_window_ = false;
             }
         }
         flag_in_polling_loop_ = false;
@@ -420,8 +420,24 @@ namespace vxs_ros1
         vxs_sensor_ros1::UpdateObservationWindow::Request &request,
         vxs_sensor_ros1::UpdateObservationWindow::Response &result)
     {
-        on_time_ = request.on_time;
-        period_time_ = request.period_time;
+        if (request.on_time > 10)
+        {
+            result.status_message = "Parameter on_time greater than 10!";
+            result.success = false;
+        }
+        else if (request.period_time < request.on_time)
+        {
+            result.status_message = "Parameter period_time must be greater than on_time!";
+            result.success = false;
+        }
+        else
+        {
+            on_time_ = request.on_time;
+            period_time_ = request.period_time;
+            result.status_message = "vxs_node: Updating observation window...";
+            result.success = true;
+        }
         flag_update_observation_window_ = true;
+        return true;
     }
 } // end namespace vxs_ros
