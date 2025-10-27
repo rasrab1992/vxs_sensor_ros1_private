@@ -35,7 +35,6 @@ namespace vxs_ros1
         nhp.param<bool>("publish_pointcloud", publish_pointcloud_, false);
         nhp.param<bool>("publish_events", publish_events_, false);
         nhp.param<bool>("publish_imu", publish_imu_, false);
-
         nhp.param<int>("fps", fps_, 20);
         period_ = std::lround(1000.0f / fps_); // period in ms (will be used in initialization if streaming events)
 
@@ -182,7 +181,7 @@ namespace vxs_ros1
         while (!flag_shutdown_request_)
         {
             // Wait until data ready
-            while (!vxsdk::vxCheckForData())
+            while (!vxsdk::vxCheckForData() && !flag_shutdown_request_)
             {
                 std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms_));
             }
