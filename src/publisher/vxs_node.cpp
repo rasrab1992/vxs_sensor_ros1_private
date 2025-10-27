@@ -34,7 +34,7 @@ namespace vxs_ros1
         nhp.param<bool>("publish_depth_image", publish_depth_image_, false);
         nhp.param<bool>("publish_pointcloud", publish_pointcloud_, false);
         nhp.param<bool>("publish_events", publish_events_, false);
-        nhp.param<int>("fps", fps_, true);
+        nhp.param<int>("fps", fps_, 20);
         period_ = std::lround(1000.0f / fps_); // period in ms (will be used in initialization if streaming events)
 
         if (publish_events_)
@@ -158,8 +158,9 @@ namespace vxs_ros1
         while (!flag_shutdown_request_)
         {
             // Wait until data ready
-            while (!vxsdk::vxCheckForData())
+            while (!vxsdk::vxCheckForData() && !flag_shutdown_request_)
             {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
             if (publish_events_) // streaming based publishing
             {
@@ -288,7 +289,7 @@ namespace vxs_ros1
         cam_info_msg.header.frame_id = depth_image_msg.header.frame_id;
         cam_info_msg.width = depth_image_msg.width;
         cam_info_msg.height = depth_image_msg.height;
-        cam_info_msg.distortion_model = "plumn_bob";
+        cam_info_msg.distortion_model = "plumb_bob";
 
         cam_info_msg.D = {cams_[0].dist[0], cams_[0].dist[1], cams_[0].dist[2], cams_[0].dist[3], cams_[0].dist[4]};
         cam_info_msg.K = {                                                      //
