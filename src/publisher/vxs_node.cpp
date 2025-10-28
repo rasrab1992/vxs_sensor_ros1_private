@@ -421,21 +421,16 @@ namespace vxs_ros1
         vxs_sensor_ros1::UpdateObservationWindow::Request &request,
         vxs_sensor_ros1::UpdateObservationWindow::Response &result)
     {
-        if (request.on_time > 10)
-        {
-            result.status_message = "Parameter on_time greater than 10!";
+        if (request.on_time <= 0 || request.period_time <= 0) {
+            result.status_message = "on_time and period_time must be > 0 (ms).";
             result.success = false;
-        }
-        else if (request.period_time < request.on_time)
-        {
-            result.status_message = "Parameter period_time must be greater than on_time!";
+        } else if (request.period_time < request.on_time) {
+            result.status_message = "period_time must be >= on_time (ms).";
             result.success = false;
-        }
-        else
-        {
-            on_time_ = request.on_time;
-            period_time_ = request.period_time;
-            result.status_message = "vxs_node: Updating observation window...";
+        } else {
+            on_time_ = request.on_time;         // ms
+            period_time_ = request.period_time; // ms
+            result.status_message = "vxs_node: Updating observation window (ms).";
             result.success = true;
         }
         flag_update_observation_window_ = true;
