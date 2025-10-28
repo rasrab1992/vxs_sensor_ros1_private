@@ -408,9 +408,9 @@ namespace vxs_ros1
         for (size_t i = 0; i < msg.width; ++i)
         {
             float *point = reinterpret_cast<float *>(ptr);
-            point[0] = points[i][0]; // X coordinate
-            point[1] = points[i][1]; // Y coordinate
-            point[2] = points[i][2]; // Z coordinate
+            point[0] = points[i][0] * 0.001f; // X coordinate
+            point[1] = points[i][1] * 0.001f; // Y coordinate
+            point[2] = points[i][2] * 0.001f; // Z coordinate
             ptr += msg.point_step;
         }
         pcloud_publisher_->publish(msg);
@@ -476,10 +476,10 @@ namespace vxs_ros1
         for (size_t i = 0; i < msg.width; ++i)
         {
             float *point = reinterpret_cast<float *>(ptr);
-            point[0] = eventsXYZT[i].x;                                                                               // X coordinate
-            point[1] = eventsXYZT[i].y;                                                                               // Y coordinate
-            point[2] = eventsXYZT[i].z;                                                                               // Z coordinate
-            *reinterpret_cast<double *>(ptr + t.offset) = eventsXYZT[i].timestamp * PERIOD_75_MHZ - sensor_ref_time_; // relative to beginning
+            point[0] = eventsXYZT[i].x * 0.001f;                                                                              // X coordinate (mm -> m)
+            point[1] = eventsXYZT[i].y * 0.001f;                                                                              // Y coordinate (mm -> m)
+            point[2] = eventsXYZT[i].z * 0.001f;                                                                              // Z coordinate (mm -> m)
+            *reinterpret_cast<double *>(ptr + t.offset) = eventsXYZT[i].timestamp * PERIOD_75_MHZ - sensor_ref_time_;        // relative to beginning
             ptr += msg.point_step;
         }
         evcloud_publisher_->publish(msg);
