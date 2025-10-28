@@ -1,5 +1,8 @@
 <?xml version="1.0"?>
 <launch>
+  <!-- Tunable arguments -->
+  <arg name="on_time"     default="30"/>
+  <arg name="period_time" default="60"/>
 
    <!-- Your sensor node -->
   <node pkg="vxs_sensor_ros1" type="vxs_node" name="vxs_node" output="screen">
@@ -21,6 +24,11 @@
     <remap from="~sensor/camera_info" to="/vxs/sensor/camera_info"/>
   </node>
   
+  <node pkg="vxs_sensor_ros1" type="set_observation_window.py" name="set_observation_window"
+        output="screen">
+    <param name="on_time"     value="$(arg on_time)"/>
+    <param name="period_time" value="$(arg period_time)"/>
+  </node>
 
   <node pkg="tf2_ros" type="static_transform_publisher" name="camera_link_to_sensor"
         args="0 0 0 0.5 -0.5 0.5 -0.5 camera_link sensor"/>
@@ -28,5 +36,14 @@
 
   <node name="rviz" pkg="rviz" type="rviz" output="screen"
         args="-d $(find vxs_sensor_ros1)/config/rviz/vxs_rviz2.rviz"/>
-  <node name="rosbag_record" pkg="rosbag" type="record" output="screen" args="-O /home/vxs/vxs_ws/catkin_ws/src/vxs_sensor_ros1/record/vxs_record.bag /vxs/pcloud/events /vxs/sensor/camera_info" />
+  <!-- <node pkg="rosbag" type="record" name="rec" output="screen"
+      args="-O $(env HOME)/vxs_ws/catkin_ws/src/vxs_sensor_ros1/record/vxs_$(env USER)_record.bag \
+            /tf /tf_static /vxs_node/pcloud/events /vxs_node/sensor/camera_info" /> -->
+  <node name="rosbag_record" pkg="rosbag" type="record" output="screen"
+      args=" -O /home/vxs/vxs_ws/catkin_ws/src/vxs_sensor_ros1/record/vxs_record_jvd.bag
+             --split --size=1024 --lz4
+             /tf /tf_static
+             /vxs/pcloud/events
+             /vxs/sensor/camera_info
+           "/>
 </launch>
