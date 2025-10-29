@@ -82,6 +82,10 @@ void Preprocess::process(const sensor_msgs::PointCloud2::ConstPtr &msg, PointClo
     sim_handler(msg);
     break;
   
+  case VXS:
+    vxs_handler(msg);
+    break;
+  
   default:
     printf("Error LiDAR Type");
     break;
@@ -477,6 +481,81 @@ void Preprocess::sim_handler(const sensor_msgs::PointCloud2::ConstPtr &msg) {
         added_pt.normal_z = 0;
         added_pt.curvature = 0.0;
         pl_surf.points.push_back(added_pt);
+    }
+}
+
+void Preprocess::vxs_handler(const sensor_msgs::PointCloud2::ConstPtr &msg)
+{
+    pl_surf.clear();
+    pl_corn.clear();
+    pl_full.clear();
+
+    const size_t num_points = msg->width * msg->height;
+    pl_surf.reserve(num_points);
+
+    int x_offset = -1, y_offset = -1, z_offset = -1, t_offset = -1;
+    for (const auto &field : msg->fields) {
+        if (field.name == "x")      x_offset = field.offset;
+        else if (field.name == "y") y_offset = field.offset;
+        else if (field.name == "z") z_offset = field.offset;
+        else if (field.name == "t") t_offset = field.offset;
+    }
+    if (x_offset < 0 || y_offset < 0 || z_offset < 0) {
+        ROS_ERROR("VXS: missing x/y/z fields");
+        return;
+    }
+
+    const uint8_t *data = msg->data.data();
+    std::vector<double> ts;
+    ts.reserve(num_points);
+    std::vector<PointType> buffer;
+    buffer.reserve(num_points);
+
+    for (size_t i = 0; i < num_points; ++i) {
+        if (i % point_filter_num != 0) continue;
+        const uint8_t *ptr = data + i * msg->point_step;
+
+        float x_sensor = *reinterpret_cast<const float *>(ptr + x_offset);
+        float y_sensor = *reinterpret_cast<const float *>(ptr + y_offset);
+        float z_sensor = *reinterpret_cast<const float *>(ptr + z_offset);
+
+        // Convert sensor (camera-like) axes to FAST-LIO body frame.
+        float x_ros = z_sensor;
+        float y_ros = -x_sensor;
+        float z_ros = -y_sensor;
+
+        double r2 = x_ros * x_ros + y_ros * y_ros + z_ros * z_ros;
+        if (r2 < blind * blind || r2 > 4.0) continue;
+
+        PointType pt;
+        pt.x = x_ros;
+        pt.y = y_ros;
+        pt.z = z_ros;
+        pt.intensity = 100.f;
+        pt.normal_x = pt.normal_y = pt.normal_z = 0.f;
+
+        double t_ns = 0.0;
+        if (t_offset >= 0) {
+            t_ns = *reinterpret_cast<const double *>(ptr + t_offset);
+        }
+
+        buffer.push_back(pt);
+        ts.push_back(t_ns);
+    }
+
+    if (!buffer.empty() && t_offset >= 0) {
+        const double tmin = *std::min_element(ts.begin(), ts.end());
+        const double tmax = *std::max_element(ts.begin(), ts.end());
+        for (size_t i = 0; i < buffer.size(); ++i) {
+            buffer[i].curvature = static_cast<float>((ts[i] - tmin) * 1e-6); // ns -> ms
+            pl_surf.push_back(buffer[i]);
+        }
+        ROS_INFO_THROTTLE(1.0, "VXS: %zu pts, span %.3f ms", pl_surf.size(), (tmax - tmin) * 1e-6);
+    } else {
+        for (auto &pt : buffer) {
+            pt.curvature = 0.f;
+            pl_surf.push_back(pt);
+        }
     }
 }
 
