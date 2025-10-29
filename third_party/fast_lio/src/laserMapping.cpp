@@ -333,6 +333,29 @@ void livox_pcl_cbk(const livox_ros_driver::CustomMsg::ConstPtr &msg)
     sig_buffer.notify_all();
 }
 
+void vxs_pcl_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg)
+{
+    mtx_buffer.lock();
+    double preprocess_start_time = omp_get_wtime();
+    scan_count++;
+    if (msg->header.stamp.toSec() < last_timestamp_lidar)
+    {
+        ROS_ERROR("lidar loop back, clear buffer");
+        lidar_buffer.clear();
+    }
+    last_timestamp_lidar = msg->header.stamp.toSec();
+
+    PointCloudXYZI::Ptr ptr(new PointCloudXYZI());
+    p_pre->process(msg, ptr);  // This will trigger vxs_handler()
+    lidar_buffer.push_back(ptr);
+    time_buffer.push_back(last_timestamp_lidar);
+
+    s_plot11[scan_count] = omp_get_wtime() - preprocess_start_time;
+    mtx_buffer.unlock();
+    sig_buffer.notify_all();
+}
+
+
 void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in) 
 {
     publish_count ++;
@@ -842,9 +865,17 @@ int main(int argc, char** argv)
         cout << "~~~~"<<ROOT_DIR<<" doesn't exist" << endl;
 
     /*** ROS subscribe initialization ***/
-    ros::Subscriber sub_pcl = p_pre->lidar_type == AVIA ? \
-        nh.subscribe(lid_topic, 200000, livox_pcl_cbk) : \
-        nh.subscribe(lid_topic, 200000, standard_pcl_cbk);
+    // ros::Subscriber sub_pcl = p_pre->lidar_type == AVIA ? \
+    //     nh.subscribe(lid_topic, 200000, livox_pcl_cbk) : \
+    //     nh.subscribe(lid_topic, 200000, standard_pcl_cbk);
+    ros::Subscriber sub_pcl;
+    if (p_pre->lidar_type == AVIA)
+        sub_pcl = nh.subscribe(lid_topic, 200000, livox_pcl_cbk);
+    else if (p_pre->lidar_type == VXS)
+        sub_pcl = nh.subscribe(lid_topic, 200000, vxs_pcl_cbk);
+    else
+        sub_pcl = nh.subscribe(lid_topic, 200000, standard_pcl_cbk);
+        
     ros::Subscriber sub_imu = nh.subscribe(imu_topic, 200000, imu_cbk);
     ros::Publisher pubLaserCloudFull = nh.advertise<sensor_msgs::PointCloud2>
             ("/cloud_registered", 100000);
