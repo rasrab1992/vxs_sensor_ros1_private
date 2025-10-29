@@ -1,0 +1,41 @@
+<launch>
+    <!-- 1. Start your VXS sensor -->
+    <include file="$(find vxs_sensor_ros1)/launch/vxs_events.launch"/>
+
+    
+    <!-- 2. Start fake IMU publisher (since you don't have real IMU) -->
+    <node pkg="vxs_fastlio_bridge" type="fake_imu_publisher" name="fake_imu_node" output="screen"/>
+    
+    <!-- 3. Load Fast-LIO parameters for VXS -->
+    <rosparam command="load" file="$(find fast_lio)/config/voxelsensors.yaml"/>
+    
+    <!-- 4. Fast-LIO specific parameters -->
+    <param name="feature_extract_enable" type="bool" value="0"/>
+    <param name="point_filter_num" type="int" value="1"/>
+    <param name="max_iteration" type="int" value="5"/> 4
+    <param name="filter_size_surf" type="double" value="0.03"/> <!-- was 0.05 -->
+    <param name="filter_size_map" type="double" value="0.08"/> <!-- was 0.1 -->
+    <param name="cube_side_length" type="double" value="5"/> <!-- was 10 -->
+    <param name="runtime_pos_log_enable" type="bool" value="0"/>
+    <param name="imu_en" value="0" type="int"/>
+    <param name="undistortion_en" value="0" type="int"/>
+    
+    <!-- 5. Start Fast-LIO -->
+    <node pkg="fast_lio" type="fastlio_mapping" name="laserMapping" output="screen"/>
+    
+    <node pkg="tf" type="static_transform_publisher" name="body_to_base_link"
+      args="0 0 0 0 0 0 body base_link 100"/>
+    
+    <!-- 6. TF TRANSFORMS with your working quaternion -->
+    <!-- <node pkg="tf" type="static_transform_publisher" name="map_to_camera_init"
+          args="0 0 0 0 0 0 1 map camera_init 100"/>
+          
+    <node pkg="tf" type="static_transform_publisher" name="camera_init_to_sensor"
+        args="0 0 0 -1.5708 0 -1.5708 camera_init sensor 100"/> -->
+
+    <!-- 6. Optional: Start RViz for visualization -->
+    <arg name="rviz" default="true"/>
+    <group if="$(arg rviz)">
+        <node pkg="rviz" type="rviz" name="rviz" args="-d $(find fast_lio)/rviz_cfg/loam_livox.rviz"/>
+    </group>
+</launch>
