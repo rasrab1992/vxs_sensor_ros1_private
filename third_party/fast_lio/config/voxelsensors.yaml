@@ -1,0 +1,33 @@
+common:
+    lid_topic:  "/vxs/pcloud/events"
+    imu_topic:  "/fake_imu"
+    time_sync_en: false
+    time_offset_lidar_to_imu: 0.0
+
+preprocess:
+    lidar_type: 4  # VXS
+    scan_line: 1
+    blind: 0.01  # 10mm minimum range (in meters after conversion)
+
+mapping:
+    acc_cov: 100.0  # Very high to ignore IMU
+    gyr_cov: 100.0  
+    b_acc_cov: 10.0 #1.0
+    b_gyr_cov: 10.0 #1.0
+    fov_degree: 50 # 90
+    det_range: 1.5 # 2 meters max
+    extrinsic_est_en: false
+    extrinsic_T: [0.0, 0.0, 0.0]
+    extrinsic_R: [1, 0, 0,
+                  0, 1, 0,
+                  0, 0, 1]
+
+publish:
+    path_en: true
+    scan_publish_en: true
+    dense_publish_en: true
+    scan_bodyframe_pub_en: true
+
+pcd_save:
+    pcd_save_en: false
+    interval: -1
