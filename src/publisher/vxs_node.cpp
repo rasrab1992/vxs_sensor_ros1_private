@@ -3,6 +3,7 @@
 
 #include "publisher/vxs_node.hpp"
 #include "common.hpp"
+#include "imu.hpp"
 
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
@@ -34,6 +35,8 @@ namespace vxs_ros1
         nhp.param<bool>("publish_depth_image", publish_depth_image_, false);
         nhp.param<bool>("publish_pointcloud", publish_pointcloud_, false);
         nhp.param<bool>("publish_events", publish_events_, false);
+        nhp.param<bool>("publish_imu", publish_imu_, false);
+
         nhp.param<int>("fps", fps_, true);
         period_ = std::lround(1000.0f / fps_); // period in ms (will be used in initialization if streaming events)
 
@@ -160,6 +163,7 @@ namespace vxs_ros1
             // Wait until data ready
             while (!vxsdk::vxCheckForData())
             {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
             if (publish_events_) // streaming based publishing
             {
@@ -186,6 +190,23 @@ namespace vxs_ros1
                     PublishPointcloud(points);
                 }
             }
+
+            // Check for imu samples
+            if (publish_imu_)
+            {
+                std::vector<imu::IMUSample> imu_samples;
+                int num_samples;
+                vxsdk::vxIMU *sample_ptr = vxsdk::vxGetIMU(num_samples);
+                if (num_samples > 0)
+                {
+                    for (size_t i = 0; i < num_samples; i++)
+                    {
+                        imu_samples.emplace_back(*sample_ptr);
+                        sample_ptr++;
+                    }
+                }
+            }
+
             // Check for observation window update
             if (flag_update_observation_window_)
             {

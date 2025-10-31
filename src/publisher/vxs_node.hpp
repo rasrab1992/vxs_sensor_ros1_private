@@ -22,6 +22,7 @@
 #include <ros/ros.h>
 #include <ros/package.h>
 #include <sensor_msgs/Image.h>
+#include <sensor_msgs/Imu.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/PointField.h>
@@ -100,6 +101,9 @@ namespace vxs_ros1
 
         //! Publish events flag. This should override depth + simpple pointcloud publishers
         bool publish_events_;
+
+        //! Publish imu samples (if available)
+        bool publish_imu_;
 
         //! Shut down request flag
         bool flag_shutdown_request_;
