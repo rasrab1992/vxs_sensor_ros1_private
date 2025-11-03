@@ -89,12 +89,10 @@ namespace imu
                                     gyroZ(_gyroZ),                        //
                                     stamp(_stamp),                        //
                                     stamp_seconds(stamp * PERIOD_75_MHZ), //
-                                    aX(accelX * accel_scaler),            //
-                                    aY(accelY * accel_scaler),            //
-                                    aZ(accelZ * accel_scaler),            //
                                     omegaX(gyroX * gyro_scaler),          //
                                     omegaY(gyroY * gyro_scaler),          //
                                     omegaZ(gyroZ * gyro_scaler)
+
         {
         }
 

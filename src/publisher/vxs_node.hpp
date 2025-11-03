@@ -15,7 +15,7 @@
 #include <string>
 
 #include <thread>
-#include <mutex>
+#include <shared_mutex>
 
 #include <yaml-cpp/yaml.h>
 
@@ -36,6 +36,10 @@
 
 using namespace std::chrono_literals;
 
+namespace imu
+{
+    struct IMUSample;
+}
 namespace vxs_ros1
 {
     struct CameraCalibration;
@@ -60,6 +64,9 @@ namespace vxs_ros1
     {
 
     public:
+        //! Use this to convert long int to a double timestamp in seconds
+        static constexpr double PERIOD_75_MHZ = 13.3333 * 1e-9;
+
         //! Sensor dimensions here. @TODO: Should be able to get that from the SDK?
         static const int SENSOR_WIDTH = 300;
         static const int SENSOR_HEIGHT = 300;
@@ -82,6 +89,7 @@ namespace vxs_ros1
         std::shared_ptr<ros::Publisher> cam_info_publisher_;
         std::shared_ptr<ros::Publisher> pcloud_publisher_;
         std::shared_ptr<ros::Publisher> evcloud_publisher_;
+        std::shared_ptr<ros::Publisher> imu_publisher_;
 
         //! FPS
         int fps_;
@@ -114,6 +122,15 @@ namespace vxs_ros1
         //! observation window parameters
         int on_time_, period_time_;
 
+        //! Reference ros Time for both frames and imu samples.
+        ros::Time ref_time_;
+        //! Reference time in the sensor
+        double sensor_ref_time_;
+        //! Flag indicating that reference time is initialized
+        bool flag_ref_time_initialized_;
+        //! Mutex for reference time members
+        std::shared_timed_mutex ref_time_mutex_;
+
         //! Camera #1 calibration
         std::vector<CameraCalibration> cams_;
 
@@ -125,7 +142,7 @@ namespace vxs_ros1
 
         //! Initializae sensor
         bool InitSensor();
-        //! The main loop of the frame ppolling thread
+        //! The main loop of the frame polling thread
         void FramePollingLoop();
         //! Unpack sensor data into a cv::Mat and return 3D points
         cv::Mat UnpackFrameSensorData(float *frameXYZ, std::vector<cv::Vec3f> &points);
@@ -138,6 +155,8 @@ namespace vxs_ros1
         void PublishPointcloud(const std::vector<cv::Vec3f> &points);
         //! Pubish stamped pointcloud
         void PublishStampedPointcloud(const int N, vxsdk::vxXYZT *eventsXYZT);
+        //! Publish imu sample
+        void PublishIMUSample(const imu::IMUSample &sample);
         //! Update observation window callback
         bool UpdateObservationWindowCB(
             vxs_sensor_ros1::UpdateObservationWindow::Request &request,
