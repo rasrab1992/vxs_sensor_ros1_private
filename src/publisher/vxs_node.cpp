@@ -54,8 +54,15 @@ namespace vxs_ros1
             }
             ROS_INFO_STREAM("Pointcloud publisher: " << (publish_pointcloud_ ? "ENABLED." : "DISABLED.") << std::endl);
             ROS_INFO_STREAM("Depth image publisher: " << (publish_depth_image_ ? "ENABLED." : "DISABLED.") << std::endl);
+            if (publish_imu_)
+            {
+                publish_imu_ = false;
+                ROS_INFO_STREAM("IMU sample will **NOT** be published in frame mode... ");
+            }
         }
+
         ROS_INFO_STREAM("SDK Mode: " << (publish_events_ ? "STREAM." : "FRAME.") << std::endl);
+        ROS_INFO_STREAM("Publish IMU: " << (publish_imu_ ? "YES." : "NO.") << std::endl);
 
         nhp.param<std::string>("config_json", config_json_, "config/and2_median_golden.json");
         nhp.param<std::string>("calib_json", calib_json_, "config/default_calib.json");
