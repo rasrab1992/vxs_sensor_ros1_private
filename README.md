@@ -138,6 +138,7 @@ Now run the node with the following:
 - **fps (int)**                  : If using **frame-based mode** (see first two arguments), it specifies the frame-rate. For frame-based mode, then **valid fps values are 1, 15, 30, 60, 90, 180**. Otherwise, if the node is on **streaming mode**, then **fps** can have any positive value and will determine the **period throughout which it will capture events (i.e. `XYZt` data).
 - **config_json (string)**       : The full path to the SDK configuration json.
 - **calib_json (string)**        : The full path to the calibration json.
+- **sleep_time_ms (int)**        : Time to set the polling thread to sleep while waiting for a new frame/batch of events.
 - **binning_amount (int)**              : (Filtering arg. 1). Default: 0
 - **prefiltering_threshold (float)**    : (Filtering arg. 2). Default: 2.0
 - **filterP1 (float)**                  : (Filtering arg. 3). Default: 0.1
