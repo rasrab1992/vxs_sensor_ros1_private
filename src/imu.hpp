@@ -39,7 +39,7 @@ namespace imu
         static constexpr double PERIOD_75_MHZ = 1e-9 * 13.3333;
 
         //! Using maximum FSR = 250 for gyro. @TODO: verify this!!!!)
-        static constexpr float gyro_scaler = (1.0f * Gyro_1000_FSR) / 32767;
+        static constexpr float gyro_scaler = (1.0f * Gyro_250_FSR) / 32767;
         //! Accelerometer FSR = 16g (verified from readings).
         static constexpr float g = 9.81f;
         static constexpr float accel_scaler = g / Accel_16g_FSR;

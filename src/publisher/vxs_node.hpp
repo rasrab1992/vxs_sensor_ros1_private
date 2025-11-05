@@ -121,6 +121,8 @@ namespace vxs_ros1
         std::atomic<bool> flag_update_observation_window_;
         //! observation window parameters
         int on_time_, period_time_;
+        //! Mainloop sleep time
+        int sleep_time_ms_;
 
         //! Reference ros Time for both frames and imu samples.
         ros::Time ref_time_;

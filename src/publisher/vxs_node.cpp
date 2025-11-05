@@ -35,8 +35,11 @@ namespace vxs_ros1
         nhp.param<bool>("publish_events", publish_events_, false);
         nhp.param<bool>("publish_imu", publish_imu_, false);
 
-        nhp.param<int>("fps", fps_, true);
+        nhp.param<int>("fps", fps_, 20);
         period_ = std::lround(1000.0f / fps_); // period in ms (will be used in initialization if streaming events)
+
+        nhp.param<int>("sleep_time_ms", sleep_time_ms_, 5);
+        ROS_INFO_STREAM("Sleep time in waiting loop: " << sleep_time_ms_ << " ms.");
 
         if (publish_events_)
         {
@@ -109,7 +112,7 @@ namespace vxs_ros1
 
         cam_info_publisher_ = std::make_shared<ros::Publisher>(nhp_.advertise<sensor_msgs::CameraInfo>("sensor/camera_info", 10));
 
-        imu_publisher_ = publish_imu_ ? std::make_shared<ros::Publisher>(nhp_.advertise<sensor_msgs::Imu>("imu/data", 10)) : nullptr;
+        imu_publisher_ = publish_imu_ ? std::make_shared<ros::Publisher>(nhp_.advertise<sensor_msgs::Imu>("imu", 10)) : nullptr;
 
         // Initialize & start polling thread
         ROS_INFO_STREAM("Starting publisher thread...");
@@ -171,7 +174,7 @@ namespace vxs_ros1
             // Wait until data ready
             while (!vxsdk::vxCheckForData())
             {
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms_));
             }
             if (publish_events_) // streaming based publishing
             {
@@ -200,7 +203,7 @@ namespace vxs_ros1
             }
 
             // Check for imu samples
-            if (!publish_imu_)
+            if (publish_imu_)
             {
                 std::vector<imu::IMUSample> imu_samples;
                 int num_samples;
