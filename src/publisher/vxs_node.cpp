@@ -12,7 +12,8 @@ namespace vxs_ros1
 {
 
     const float FilteringParams::DEFAULT_PREFILTERING_THRESH = 2.0;
-    const float FilteringParams::DEFAULT_FILTERP1 = 0.1;
+    const float FilteringParams::DEFAULT_FILTERP1X = 0.1;
+    const float FilteringParams::DEFAULT_FILTERP1Y = 0.1;
 
     VxsSensorPublisher::VxsSensorPublisher(const ros::NodeHandle &nh,
                                            const ros::NodeHandle &nhp) : nh_(nh),                                                //
@@ -73,9 +74,15 @@ namespace vxs_ros1
         // Filtering parameters
         nhp.param<int>("binning_amount", filtering_params_.binning_amount, FilteringParams::DEFAULT_BINNING);
         nhp.param<float>("prefiltering_threshold", filtering_params_.prefiltering_threshold, FilteringParams::DEFAULT_PREFILTERING_THRESH);
-        nhp.param<float>("filterP1", filtering_params_.filterP1, FilteringParams::DEFAULT_FILTERP1);
+        nhp.param<int>("postfiltering_threshold", filtering_params_.postfiltering_threshold, FilteringParams::DEFAULT_POSTFILTERING_THRESH);
+
+        nhp.param<float>("filterP1X", filtering_params_.filterP1X, FilteringParams::DEFAULT_FILTERP1X);
+        nhp.param<float>("filterP1Y", filtering_params_.filterP1Y, FilteringParams::DEFAULT_FILTERP1Y);
+
         nhp.param<int>("temporal_threshold", filtering_params_.temporal_threshold, FilteringParams::DEFAULT_TEMPORAL_THRESH);
         nhp.param<int>("spatial_threshold", filtering_params_.spatial_threshold, FilteringParams::DEFAULT_SPATIAL_THRESH);
+
+        nhp.param<int>("postfiltering_threshold", filtering_params_.median_rejection_threshold, FilteringParams::DEFAULT_MEDIAN_REJECTION_THRESH);
 
         // Print param values
         ROS_INFO_STREAM("Publish frame-based depth image (publlish_depth_image): " << (publish_depth_image_ ? "YES." : "NO."));
@@ -150,10 +157,13 @@ namespace vxs_ros1
         }
         // Set filtering parameters
         vxsdk::vxSetBinningAmount(filtering_params_.binning_amount);
-        vxsdk::vxSetFilteringParameters(              //
-            filtering_params_.prefiltering_threshold, //
-            filtering_params_.filterP1,               //
-            filtering_params_.temporal_threshold,     //
+        vxsdk::vxSetFilteringParameters(                  //
+            filtering_params_.prefiltering_threshold,     //
+            filtering_params_.postfiltering_threshold,    //
+            filtering_params_.median_rejection_threshold, //
+            filtering_params_.filterP1X,                  //
+            filtering_params_.filterP1Y,                  //
+            filtering_params_.temporal_threshold,         //
             filtering_params_.spatial_threshold);
 
         // Start the SDK Engine.
