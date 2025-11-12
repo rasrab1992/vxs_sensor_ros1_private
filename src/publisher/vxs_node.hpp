@@ -15,13 +15,14 @@
 #include <string>
 
 #include <thread>
-#include <mutex>
+#include <shared_mutex>
 
 #include <yaml-cpp/yaml.h>
 
 #include <ros/ros.h>
 #include <ros/package.h>
 #include <sensor_msgs/Image.h>
+#include <sensor_msgs/Imu.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/PointField.h>
@@ -35,6 +36,10 @@
 
 using namespace std::chrono_literals;
 
+namespace imu
+{
+    struct IMUSample;
+}
 namespace vxs_ros1
 {
     struct CameraCalibration;
@@ -43,22 +48,35 @@ namespace vxs_ros1
     struct FilteringParams
     {
         static const int DEFAULT_BINNING = 0;
-        static const float DEFAULT_PREFILTERING_THRESH; // = 2.0;
-        static const float DEFAULT_FILTERP1;            // = 0.1;
+        static const float DEFAULT_PREFILTERING_THRESH;    // = 2.0;
+        static const int DEFAULT_POSTFILTERING_THRESH = 5; //
+
+        static const float DEFAULT_FILTERP1X; // = 0.1;
+        static const float DEFAULT_FILTERP1Y; // = 0.1;
         static const int DEFAULT_TEMPORAL_THRESH = 4;
         static const int DEFAULT_SPATIAL_THRESH = 10;
 
+        static const int DEFAULT_MEDIAN_REJECTION_THRESH = 5; //
+
         int binning_amount = DEFAULT_BINNING;
         float prefiltering_threshold = DEFAULT_PREFILTERING_THRESH;
-        float filterP1 = DEFAULT_FILTERP1;
+        int postfiltering_threshold = DEFAULT_POSTFILTERING_THRESH;
+
+        float filterP1X = DEFAULT_FILTERP1X;
+        float filterP1Y = DEFAULT_FILTERP1Y;
         int temporal_threshold = DEFAULT_TEMPORAL_THRESH;
         int spatial_threshold = DEFAULT_SPATIAL_THRESH;
+
+        int median_rejection_threshold = DEFAULT_MEDIAN_REJECTION_THRESH;
     };
 
     class VxsSensorPublisher
     {
 
     public:
+        //! Use this to convert long int to a double timestamp in seconds
+        static constexpr double PERIOD_75_MHZ = 13.3333 * 1e-9;
+
         //! Sensor dimensions here. @TODO: Should be able to get that from the SDK?
         static const int SENSOR_WIDTH = 300;
         static const int SENSOR_HEIGHT = 300;
@@ -81,6 +99,7 @@ namespace vxs_ros1
         std::shared_ptr<ros::Publisher> cam_info_publisher_;
         std::shared_ptr<ros::Publisher> pcloud_publisher_;
         std::shared_ptr<ros::Publisher> evcloud_publisher_;
+        std::shared_ptr<ros::Publisher> imu_publisher_;
 
         //! FPS
         int fps_;
@@ -101,6 +120,9 @@ namespace vxs_ros1
         //! Publish events flag. This should override depth + simpple pointcloud publishers
         bool publish_events_;
 
+        //! Publish imu samples (if available)
+        bool publish_imu_;
+
         //! Shut down request flag
         bool flag_shutdown_request_;
         //! Flag indicating execution is inside the polling loop.
@@ -109,6 +131,17 @@ namespace vxs_ros1
         std::atomic<bool> flag_update_observation_window_;
         //! observation window parameters
         int on_time_, period_time_;
+        //! Mainloop sleep time
+        int sleep_time_ms_;
+
+        //! Reference ros Time for both frames and imu samples.
+        ros::Time ref_time_;
+        //! Reference time in the sensor
+        double sensor_ref_time_;
+        //! Flag indicating that reference time is initialized
+        bool flag_ref_time_initialized_;
+        //! Mutex for reference time members
+        std::shared_timed_mutex ref_time_mutex_;
 
         //! Camera #1 calibration
         std::vector<CameraCalibration> cams_;
@@ -121,7 +154,7 @@ namespace vxs_ros1
 
         //! Initializae sensor
         bool InitSensor();
-        //! The main loop of the frame ppolling thread
+        //! The main loop of the frame polling thread
         void FramePollingLoop();
         //! Unpack sensor data into a cv::Mat and return 3D points
         cv::Mat UnpackFrameSensorData(float *frameXYZ, std::vector<cv::Vec3f> &points);
@@ -134,6 +167,8 @@ namespace vxs_ros1
         void PublishPointcloud(const std::vector<cv::Vec3f> &points);
         //! Pubish stamped pointcloud
         void PublishStampedPointcloud(const int N, vxsdk::vxXYZT *eventsXYZT);
+        //! Publish imu sample
+        void PublishIMUSample(const imu::IMUSample &sample);
         //! Update observation window callback
         bool UpdateObservationWindowCB(
             vxs_sensor_ros1::UpdateObservationWindow::Request &request,

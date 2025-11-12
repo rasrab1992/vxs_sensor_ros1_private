@@ -88,8 +88,14 @@ set(VXS_NODE_INCLUDE_DIRS
     INCLUDE_DIRS ${VXS_NODE_INCLUDE_DIRS}
   )
 
-set(VXS_NODE_SOURCES 
+set(COMMON_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/common.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/imu.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/imu.cpp
+)
+
+set(VXS_NODE_SOURCES 
+    ${COMMON_SOURCES}
     ${CMAKE_CURRENT_SOURCE_DIR}/src/publisher/vxs_node.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/publisher/vxs_node.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/publisher/vxs_node_main.cpp)
@@ -114,7 +120,7 @@ set(VXS_SUB_INCLUDE_DIRS
 )
 
 set(VXS_SUB_SOURCES 
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/common.hpp
+    ${COMMON_SOURCES}
     ${CMAKE_CURRENT_SOURCE_DIR}/src/subscriber/vxs_subscriber.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/subscriber/vxs_subscriber.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/subscriber/vxs_subscriber_main.cpp)
