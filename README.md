@@ -49,6 +49,10 @@ for an AMD system **without** Nvidia hardware,
 
 ``docker pull terzakig/vxs_ros1:amd64_no_gpu``
 
+for an **nvidia/arm64** (Jetson),
+
+``docker pull terzakig/vxs_ros1:arm64``
+
 This should take about an hour, depending on the connection. When done, verify that the docker container is there by executing,
 
 ``docker image list``
@@ -97,9 +101,15 @@ and clone,
 
 ``git clone https://github.com/VoxelSensors/vxs_sensor_ros1.git``
 
-Then, copy the rosinstall script from the `vxs_sensor_ros1` repository into `src` as follows:
+#### Copy appropriate rosinstall file
 
-``cp vxs_sensor_ros1/rosinstall/rosinstall ./.rosinstall``
+If setting up the workspace in a **pc/amd architecture**, copy the rosinstall script from the `vxs_sensor_ros1` repository into `src` as follows:
+
+``cp vxs_sensor_ros1/rosinstall/rosinstall_amd64 ./.rosinstall``
+
+If setting up the workspace in an **nvidia/arm64 machine**, then copy the arm64 rosinstall script  from the `vxs_sensor_ros1` repository into `src` as follows:
+
+``cp vxs_sensor_ros1/rosinstall/rosinstall_arm64 ./.rosinstall``
 
 Now, execute the rosinstall 
 
