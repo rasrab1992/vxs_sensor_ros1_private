@@ -1,0 +1,14 @@
+# IT IS UNLIKELY YOU WANT TO EDIT THIS FILE BY HAND,
+# UNLESS FOR REMOVING ENTRIES.
+# IF YOU WANT TO CHANGE THE ROS ENVIRONMENT VARIABLES
+# USE THE rosinstall TOOL INSTEAD.
+# IF YOU CHANGE IT, USE rosinstall FOR THE CHANGES TO TAKE EFFECT
+- git: {local-name: ros-from-source/image_common, uri: 'https://github.com/ros-perception/image_common.git',
+    version: noetic-devel}
+- git: {local-name: ros-from-source/image_pipeline, uri: 'https://github.com/ros-perception/image_pipeline.git',
+    version: noetic}
+- git: {local-name: ros-from-source/vision_opencv, uri: 'https://github.com/ros-perception/vision_opencv.git',
+    version: noetic}
+- git: {local-name: vxs_sensor_ros1, uri: 'https://github.com/VoxelSensors/vxs_sensor_ros1.git',
+    version: master}
+    
