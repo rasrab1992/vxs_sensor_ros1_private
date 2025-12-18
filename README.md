@@ -47,11 +47,11 @@ for an AMD system with Nvidia hardware,
 
 for an AMD system **without** Nvidia hardware,
 
-``docker pull terzakig/vxs_ros1:amd64_no_gpu``
+``docker pull terzakig/vxsros1:amd64_no_gpu``
 
 for an **nvidia/arm64** (Jetson),
 
-``docker pull terzakig/vxs_ros1:arm64``
+``docker pull terzakig/vxsros1:arm64``
 
 This should take about an hour, depending on the connection. When done, verify that the docker container is there by executing,
 
@@ -59,11 +59,11 @@ This should take about an hour, depending on the connection. When done, verify t
 
 You should be able to see a container named `vxs_ros1` with a tag `amd64`. To run the container, use the bash script `run.sh` (or run_no_gpu.sh` if using the `amd64_no_gpu` image) provided in the `docker` directory of this repository. Use,
 
-``./run.sh vxs_ros1:amd64``
+``./run.sh vxsros1:amd64``
 
 for the `amd64` (with nvidia) image, or,
 
-``./run_no_gpu.sh vxs_ros1:amd64``
+``./run_no_gpu.sh vxsros1:amd64``
 
 for the `amd64_no_gpu` image.
 
