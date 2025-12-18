@@ -105,11 +105,11 @@ and clone,
 
 If setting up the workspace in a **pc/amd architecture**, copy the rosinstall script from the `vxs_sensor_ros1` repository into `src` as follows:
 
-``cp vxs_sensor_ros1/rosinstall/rosinstall_amd64 ./.rosinstall``
+``cp vxs_sensor_ros1_private/rosinstall/rosinstall_amd64 ./.rosinstall``
 
 If setting up the workspace in an **nvidia/arm64 machine**, then copy the arm64 rosinstall script  from the `vxs_sensor_ros1` repository into `src` as follows:
 
-``cp vxs_sensor_ros1/rosinstall/rosinstall_arm64 ./.rosinstall``
+``cp vxs_sensor_ros1_private/rosinstall/rosinstall_arm64 ./.rosinstall``
 
 Now, execute the rosinstall 
 
