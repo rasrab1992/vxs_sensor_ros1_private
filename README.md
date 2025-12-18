@@ -71,7 +71,7 @@ Note that the script assumes that you have created directories `~/vxs_ws/catkin_
 
 ## ROS1 Workspace setup \& Build
 
-### Setting up the workspace directories
+### Setting up the workspace directories ( In the host directory)
 
 First, create the appropriate workspace directories (if not there yet; if present, skip to the next section). In the home directory of the Ubuntu host (or someplace else if on Windows), 
 
@@ -91,7 +91,7 @@ Create the **ROS1 (catkin) workspace** below:
 
 ``mkdir src``
 
-### Download ROS1 Noetic packages that must be built from source, including the `vxs_sensor_ros1` package
+### Download ROS1 Noetic packages that must be built from source, including the `vxs_sensor_ros1` package (In the container)
 
 To populate the workspace, you will need to execute a **rosinstall** script. The script is located in the `rosinstall/` directory of this repository. Thus, first clone the current repository inside `src`:
 
