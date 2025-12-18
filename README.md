@@ -99,7 +99,7 @@ To populate the workspace, you will need to execute a **rosinstall** script. The
 
 and clone,
 
-``git clone https://github.com/VoxelSensors/vxs_sensor_ros1.git``
+``https://github.com/rasrab1992/vxs_sensor_ros1_private.git``
 
 #### Copy appropriate rosinstall file
 
