@@ -57,7 +57,7 @@ This should take about an hour, depending on the connection. When done, verify t
 
 ``docker image list``
 
-You should be able to see a container named `vxs_ros1` with a tag `amd64`. To run the container, use the bash script `run.sh` (or run_no_gpu.sh` if using the `amd64_no_gpu` image) provided in the `docker` directory of this repository. Use,
+You should be able to see a container named `vxsros1` with a tag `amd64`. To run the container, use the bash script `run.sh` (or run_no_gpu.sh` if using the `amd64_no_gpu` image) provided in the `docker` directory of this repository. Use,
 
 ``./run.sh vxsros1:amd64``
 
