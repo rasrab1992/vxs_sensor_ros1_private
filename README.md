@@ -65,7 +65,7 @@ for the `amd64` (with nvidia) image, or,
 
 ``./run_no_gpu.sh terzakig/vxsros1:amd64``
 
-for the `amd64_no_gpu` image.
+for the `amd64_no_gpu` image. For jetson please use `./run_arm64.sh terzakig/vxsros1:arm64`.
 
 Note that the script assumes that you have created directories `~/vxs_ws/catkin_ws`  and `~/sandbox` in the host (i.e., your machine) which will become shared between the container and the host. If these directories don't exist, the container will run anyway and it will create them on the host side as well. Not sure about this behavior in windows, as the paths are not structured the same way, but I am assuming the same will happen, just in an arbitrarry path related to the docker executable.
 
