@@ -9,6 +9,6 @@
     version: noetic}
 - git: {local-name: ros-from-source/vision_opencv, uri: 'https://github.com/ros-perception/vision_opencv.git',
     version: noetic}
-- git: {local-name: vxs_sensor_ros12, uri: 'git@github.com:rasrab1992/vxs_sensor_ros1_private.git',
+- git: {local-name: vxs_sensor_ros1, uri: 'git@github.com:rasrab1992/vxs_sensor_ros1_private.git',
     version: master}
     
