@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- VectorNav serial settings -->
+  <arg name="port"      default="/dev/ttyUSB0"/>
+  <arg name="baud_rate" default="921600"/>
+  <arg name="imu_frame" default="IMU"/>
+  <arg name="imu_respawn" default="false"/>
+  <arg name="enable_vxs" default="true"/>
+
+  <!-- LI-Init recording settings -->
+  <arg name="on_time"     default="30"/>
+  <arg name="period_time" default="60"/>
+  <arg name="use_rviz"    default="false"/>
+  <arg name="record_bag"  default="true"/>
+  <arg name="bag_path"    default="/home/vxs/vxs_ws/catkin_ws/src/vxs_sensor_ros1/record/vxs_li_init_record.bag"/>
+
+  <!-- Initial CAD guess for sensor -> IMU -->
+  <arg name="imu_tx" default="0.0"/>
+  <arg name="imu_ty" default="0.0"/>
+  <arg name="imu_tz" default="0.0"/>
+  <arg name="imu_roll"  default="0.0"/>
+  <arg name="imu_pitch" default="0.0"/>
+  <arg name="imu_yaw"   default="0.0"/>
+
+  <include file="$(find vectornav_driver)/launch/vectornav_driver_ros1.launch">
+    <arg name="port" value="$(arg port)"/>
+    <arg name="baud_rate" value="$(arg baud_rate)"/>
+    <arg name="frame_id" value="$(arg imu_frame)"/>
+    <arg name="respawn" value="$(arg imu_respawn)"/>
+  </include>
+
+  <include if="$(arg enable_vxs)" file="$(find vxs_sensor_ros1)/launch/vxs_li_init_record.launch">
+    <arg name="on_time" value="$(arg on_time)"/>
+    <arg name="period_time" value="$(arg period_time)"/>
+    <arg name="imu_topic" value="/vectornav/imu/data"/>
+    <arg name="imu_frame" value="$(arg imu_frame)"/>
+    <arg name="use_rviz" value="$(arg use_rviz)"/>
+    <arg name="record_bag" value="$(arg record_bag)"/>
+    <arg name="bag_path" value="$(arg bag_path)"/>
+    <arg name="imu_tx" value="$(arg imu_tx)"/>
+    <arg name="imu_ty" value="$(arg imu_ty)"/>
+    <arg name="imu_tz" value="$(arg imu_tz)"/>
+    <arg name="imu_roll" value="$(arg imu_roll)"/>
+    <arg name="imu_pitch" value="$(arg imu_pitch)"/>
+    <arg name="imu_yaw" value="$(arg imu_yaw)"/>
+  </include>
+</launch>

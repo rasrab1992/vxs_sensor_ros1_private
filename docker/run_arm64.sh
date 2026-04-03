@@ -48,6 +48,10 @@ touch /home/${USER}/.bash_aliases
 # Prevent docker from making the ccache for you
 [[ -d /home/${USER}/.ccache ]] || mkdir /home/${USER}/.ccache
 
+# Carry the host serial-device group into the container so the non-root user can
+# open /dev/ttyUSB* devices such as the VectorNav FTDI adapter.
+DIALOUT_GID=$(getent group dialout | cut -d: -f3)
+
 # yield permissions to the xhost (see: http://wiki.ros.org/docker/Tutorials/GUI , section 1. "The simple way")
 xhost +local:
 
@@ -72,9 +76,9 @@ docker run -it --privileged --env="DISPLAY" --runtime nvidia \
   --volume="/home/$USER/vxs_ws:/home/vxs/vxs_ws" \
   --volume="/home/$USER/sandbox:/home/vxs/sandbox" \
   --volume="/home/$USER/.bash_history:/home/vxs/.bash_history" \
-  --volume="/dev:/dev" \
+  --group-add "${DIALOUT_GID}" \
   -u $(id -u):$(id -g) \
-  ${DOCKER_IMAGE} fixuid -q sh -c "cd ~/;exec bash -l"
+  ${DOCKER_IMAGE} fixuid -q sh -c "sudo usermod -aG dialout vxs 2>/dev/null; cd ~/;exec bash -l"
 
 # revoke access controls (see: http://wiki.ros.org/docker/Tutorials/GUI , section 1. "The simple way")
 xhost -local:

@@ -1,0 +1,6 @@
+# Recorded bag files and analysis output
+record/
+
+# Backup files
+*.bak
+*.bak_*

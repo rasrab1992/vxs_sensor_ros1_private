@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="port"      default="/dev/ttyUSB0"/>
+  <arg name="baud_rate" default="921600"/>
+  <arg name="imu_frame" default="IMU"/>
+  <arg name="imu_respawn" default="false"/>
+
+  <arg name="record_bag" default="true"/>
+  <arg name="duration_sec" default="1800"/>
+  <arg name="bag_path" default="/home/vxs/vxs_ws/catkin_ws/src/vxs_sensor_ros1/record/vn100_allan_static.bag"/>
+
+  <include file="$(find vectornav_driver)/launch/vectornav_driver_ros1.launch">
+    <arg name="port" value="$(arg port)"/>
+    <arg name="baud_rate" value="$(arg baud_rate)"/>
+    <arg name="frame_id" value="$(arg imu_frame)"/>
+    <arg name="respawn" value="$(arg imu_respawn)"/>
+  </include>
+
+  <node if="$(arg record_bag)" name="rosbag_record_imu" pkg="rosbag" type="record" output="screen"
+        args="-O $(arg bag_path)
+              --duration=$(arg duration_sec)
+              /vectornav/imu/data
+              /vectornav/imu/mag
+              /vectornav/temperature
+              /vectornav/pressure
+             "/>
+</launch>

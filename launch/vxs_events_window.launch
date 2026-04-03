@@ -7,7 +7,7 @@
    <!-- Your sensor node -->
   <node pkg="vxs_sensor_ros1" type="vxs_node" name="vxs_node" output="screen">
     <param name="config_json" value="$(find vxs_sensor_ros1)/config/and2_median_golden.json"/>
-    <param name="calib_json"  value="$(find vxs_sensor_ros1)/config/calib_27_10_8mm.json"/>
+    <param name="calib_json"  value="$(find vxs_sensor_ros1)/config/calib_02_02_8mm.json"/>
     <param name="fps" type="int" value="33"/>
     <param name="publish_depth_image" type="bool" value="false"/>
     <param name="publish_pointcloud"  type="bool" value="false"/>
@@ -32,10 +32,8 @@
 
   <node pkg="tf2_ros" type="static_transform_publisher" name="camera_link_to_sensor"
         args="0 0 0 0.5 -0.5 0.5 -0.5 camera_link sensor"/>
-
-
-  <node name="rviz" pkg="rviz" type="rviz" output="screen"
-        args="-d $(find vxs_sensor_ros1)/config/rviz/vxs_rviz2.rviz"/>
+  <!-- <node name="rviz" pkg="rviz" type="rviz" output="screen"
+        args="-d $(find vxs_sensor_ros1)/config/rviz/vxs_rviz2.rviz"/> -->
   <!-- <node pkg="rosbag" type="record" name="rec" output="screen"
       args="-O $(env HOME)/vxs_ws/catkin_ws/src/vxs_sensor_ros1/record/vxs_$(env USER)_record.bag \
             /tf /tf_static /vxs_node/pcloud/events /vxs_node/sensor/camera_info" /> -->
