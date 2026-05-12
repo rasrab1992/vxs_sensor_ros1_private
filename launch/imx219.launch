@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="sensor_id"       default="0"/>
+  <arg name="width"           default="1280"/>
+  <arg name="height"          default="720"/>
+  <arg name="framerate"       default="60"/>
+  <arg name="sensor_mode"     default="4"/>
+  <arg name="frame_id"        default="camera"/>
+  <arg name="camera_info_url" default="file:///home/etro/vxs_ws/catkin_ws/src/vxs_sensor_ros1/calibration/imx219_camera_info.yaml"/>
+
+  <node pkg="gscam" type="gscam" name="imx219_gscam" output="screen" required="true">
+    <env name="GSCAM_CONFIG"
+         value="nvarguscamerasrc sensor-id=$(arg sensor_id) sensor-mode=$(arg sensor_mode)
+                ! video/x-raw(memory:NVMM),width=$(arg width),height=$(arg height),format=NV12,framerate=$(arg framerate)/1
+                ! nvvidconv flip-method=rotate-180
+                ! video/x-raw(memory:NVMM),format=I420
+                ! nvvidconv
+                ! video/x-raw,format=BGRx
+                ! videoconvert
+                ! video/x-raw,format=RGB
+                ! queue max-size-buffers=1 leaky=downstream
+                ! identity copy-buffers=true"/>
+    <param name="camera_name"     value="imx219"/>
+    <param name="camera_info_url" value="$(arg camera_info_url)"/>
+    <param name="frame_id"        value="$(arg frame_id)"/>
+    <param name="sync_sink"       value="false"/>
+    <param name="reopen_on_eof"   value="true"/>
+    <param name="image_encoding"  value="rgb8"/>
+    <remap from="camera/image_raw"   to="/camera/image_raw"/>
+    <remap from="camera/camera_info" to="/camera/camera_info"/>
+  </node>
+
+</launch>

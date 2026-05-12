@@ -48,6 +48,25 @@ touch /home/${USER}/.bash_aliases
 # Prevent docker from making the ccache for you
 [[ -d /home/${USER}/.ccache ]] || mkdir /home/${USER}/.ccache
 
+# Pass through a valid desktop runtime directory when one exists so Qt/X11 apps
+# inside the container can talk to the host session cleanly.
+XDG_RUNTIME_DIR_HOST="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+XDG_RUNTIME_DOCKER_ARGS=()
+if [ -d "${XDG_RUNTIME_DIR_HOST}" ]; then
+  XDG_RUNTIME_DOCKER_ARGS+=(
+    --env="XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR_HOST}"
+    --volume="${XDG_RUNTIME_DIR_HOST}:${XDG_RUNTIME_DIR_HOST}"
+  )
+fi
+
+# Preserve supplemental groups that grant access to host graphics devices.
+DOCKER_GROUP_ARGS=()
+for group_name in video render input sudo; do
+  if getent group "${group_name}" >/dev/null 2>&1; then
+    DOCKER_GROUP_ARGS+=(--group-add "$(getent group "${group_name}" | cut -d: -f3)")
+  fi
+done
+
 # yield permissions to the xhost (see: http://wiki.ros.org/docker/Tutorials/GUI , section 1. "The simple way")
 xhost +local:
 
@@ -59,6 +78,7 @@ docker run -it --privileged --env="DISPLAY" --runtime nvidia \
   --env="QT_X11_NO_MITSHM=1" \
   --env="USER=$USER" \
   --env="ROS_HOSTNAME=$CONTAINER_HOSTNAME" \
+  "${XDG_RUNTIME_DOCKER_ARGS[@]}" \
   --net=host \
   --volume="/dev:/dev" \
   --volume="/tmp/.X11-unix:/tmp/.X11-unix" \
@@ -74,6 +94,7 @@ docker run -it --privileged --env="DISPLAY" --runtime nvidia \
   --volume="/home/$USER/.bash_history:/home/vxs/.bash_history" \
   --volume="/dev:/dev" \
   -u $(id -u):$(id -g) \
+  "${DOCKER_GROUP_ARGS[@]}" \
   ${DOCKER_IMAGE} fixuid -q sh -c "cd ~/;exec bash -l"
 
 # revoke access controls (see: http://wiki.ros.org/docker/Tutorials/GUI , section 1. "The simple way")

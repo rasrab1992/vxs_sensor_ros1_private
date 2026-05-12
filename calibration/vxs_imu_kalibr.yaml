@@ -1,0 +1,14 @@
+# Kalibr IMU config — VXS built-in IIM-42652
+# Measured from 14m50s static bag (379,615 samples, 572 Hz, 0 glitches)
+# Allan variance analysis: record/allan_output_clean/allan_report.txt
+
+rostopic: /imu
+update_rate: 572.0
+
+# Accelerometer (worst-axis conservative values)
+accelerometer_noise_density: 6.357e-3   # m/s²/√Hz  (mean ax,ay,az)
+accelerometer_random_walk:   1.160e-3   # m/s³/√Hz
+
+# Gyroscope
+gyroscope_noise_density:     1.19e-4    # rad/s/√Hz  (best axis ωy; worst ωz=1.31e-4)
+gyroscope_random_walk:       1.0e-6     # rad/s²/√Hz (bias instability below floor)

@@ -1,0 +1,66 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="port"      default="/dev/ttyUSB0"/>
+  <arg name="baud_rate" default="921600"/>
+  <arg name="imu_frame" default="IMU"/>
+  <arg name="use_rviz"  default="true"/>
+  <arg name="on_time"     default="100"/>
+  <arg name="period_time" default="200"/>
+
+  <!-- CAD-derived initial guess: T_LI = T_(ROS LiDAR frame -> IMU).
+       These values are already expressed in the ROS LiDAR frame and are used
+       both for the static TF and as the LI-Init extrinsic seed. -->
+  <arg name="imu_tx"    default="-0.06310"/>
+  <arg name="imu_ty"    default="-0.04534"/>
+  <arg name="imu_tz"    default="-0.04282"/>
+  <arg name="imu_roll"  default="3.141593"/>
+  <arg name="imu_pitch" default="0.0"/>
+  <arg name="imu_yaw"   default="-1.570796"/>
+
+  <include file="$(find vectornav_driver)/launch/vectornav_driver_ros1.launch">
+    <arg name="port" value="$(arg port)"/>
+    <arg name="baud_rate" value="$(arg baud_rate)"/>
+    <arg name="frame_id" value="$(arg imu_frame)"/>
+    <arg name="respawn" value="false"/>
+  </include>
+
+  <include file="$(find vxs_sensor_ros1)/launch/vxs_li_init_events.launch">
+    <arg name="on_time" value="$(arg on_time)"/>
+    <arg name="period_time" value="$(arg period_time)"/>
+    <arg name="imu_frame" value="$(arg imu_frame)"/>
+    <arg name="imu_tx" value="$(arg imu_tx)"/>
+    <arg name="imu_ty" value="$(arg imu_ty)"/>
+    <arg name="imu_tz" value="$(arg imu_tz)"/>
+    <arg name="imu_roll" value="$(arg imu_roll)"/>
+    <arg name="imu_pitch" value="$(arg imu_pitch)"/>
+    <arg name="imu_yaw" value="$(arg imu_yaw)"/>
+  </include>
+
+  <node pkg="vxs_sensor_ros1" type="pointcloud_events_to_velodyne.py" name="vxs_events_to_velodyne" output="screen">
+    <param name="in_topic"  value="/vxs/pcloud/events"/>
+    <param name="out_topic" value="/vxs/pcloud/events_velo"/>
+    <param name="default_intensity" value="1.0"/>
+    <param name="default_ring" value="0"/>
+    <!-- Stage 1: range filter — discard beyond sensor max range; set 0.0 to disable -->
+    <param name="max_range"         value="2.0"/>
+    <!-- Stage 2: voxel downsampling — 3cm for always-on noisy mode -->
+    <param name="voxel_size"        value="0.03"/>
+    <!-- Stage 3: radius outlier removal — relaxed for always-on mode (larger radius, fewer required neighbours) -->
+    <param name="ror_radius"        value="0.10"/>
+    <param name="ror_min_neighbors" value="3"/>
+    <!-- Stage 4: statistical outlier removal — relaxed std threshold keeps more points -->
+    <param name="sor_k"             value="6"/>
+    <param name="sor_std_ratio"     value="3.0"/>
+  </node>
+
+  <include file="$(find lidar_imu_init)/launch/vxs_sensor.launch">
+    <arg name="rviz" value="$(arg use_rviz)"/>
+    <arg name="use_extrinsic_seed" value="true"/>
+    <arg name="imu_tx" value="$(arg imu_tx)"/>
+    <arg name="imu_ty" value="$(arg imu_ty)"/>
+    <arg name="imu_tz" value="$(arg imu_tz)"/>
+    <arg name="imu_roll" value="$(arg imu_roll)"/>
+    <arg name="imu_pitch" value="$(arg imu_pitch)"/>
+    <arg name="imu_yaw" value="$(arg imu_yaw)"/>
+  </include>
+</launch>

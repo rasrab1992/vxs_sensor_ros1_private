@@ -1,17 +1,24 @@
 <?xml version="1.0"?>
 <launch>
-  <!-- Tunable arguments -->
-  <arg name="on_time"     default="30"/>
-  <arg name="period_time" default="60"/>
+  <!-- Tunable arguments
+       SDK doc: onTime in [0x2 .. periodTime-0x2], periodTime=0x3C (60) for GOLDEN mode.
+       Use on_time=0 period_time=0 for continuous streaming (no duty-cycle windowing). -->
+  <arg name="on_time"     default="0"/>
+  <arg name="period_time" default="0"/>
+  <arg name="publish_imu" default="true"/>
 
-   <!-- Your sensor node -->
+  <!-- Your sensor node -->
   <node pkg="vxs_sensor_ros1" type="vxs_node" name="vxs_node" output="screen">
-    <param name="config_json" value="$(find vxs_sensor_ros1)/config/and2_median_golden.json"/>
-    <param name="calib_json"  value="$(find vxs_sensor_ros1)/config/calib_02_02_8mm.json"/>
+    <param name="config_json" value="$(find vxs_sensor_ros1)/config/and2_noMedian_golden_imu_1.json"/>
+    <param name="calib_json"  value="$(find vxs_sensor_ros1)/config/calib_07_04_8mm.json"/>
     <param name="fps" type="int" value="33"/>
     <param name="publish_depth_image" type="bool" value="false"/>
     <param name="publish_pointcloud"  type="bool" value="false"/>
     <param name="publish_events"      type="bool" value="true"/>
+    <param name="publish_imu"         type="bool" value="$(arg publish_imu)"/>
+    <!-- Observation window set at startup (before polling thread) to avoid SDK crash -->
+    <param name="on_time"             type="int"  value="$(arg on_time)"/>
+    <param name="period_time"         type="int"  value="$(arg period_time)"/>
 
     <param name="binning_amount"         type="int"   value="0"/>
     <param name="prefiltering_threshold" type="double" value="2.0"/>
@@ -22,14 +29,9 @@
     <!-- stable global topics -->
     <remap from="~pcloud/events" to="/vxs/pcloud/events"/>
     <remap from="~sensor/camera_info" to="/vxs/sensor/camera_info"/>
+    <remap from="~imu" to="/imu"/>
   </node>
   
-  <node pkg="vxs_sensor_ros1" type="set_observation_window.py" name="set_observation_window"
-        output="screen">
-    <param name="on_time"     value="$(arg on_time)"/>
-    <param name="period_time" value="$(arg period_time)"/>
-  </node>
-
   <node pkg="tf2_ros" type="static_transform_publisher" name="camera_link_to_sensor"
         args="0 0 0 0.5 -0.5 0.5 -0.5 camera_link sensor"/>
   <!-- <node name="rviz" pkg="rviz" type="rviz" output="screen"
@@ -38,10 +40,11 @@
       args="-O $(env HOME)/vxs_ws/catkin_ws/src/vxs_sensor_ros1/record/vxs_$(env USER)_record.bag \
             /tf /tf_static /vxs_node/pcloud/events /vxs_node/sensor/camera_info" /> -->
   <node name="rosbag_record" pkg="rosbag" type="record" output="screen"
-      args=" -O /home/vxs/vxs_ws/catkin_ws/src/vxs_sensor_ros1/record/vxs_record_jvd.bag
+      args=" -O /home/vxs/vxs_ws/catkin_ws/src/vxs_sensor_ros1/record/vxs_record_hh.bag
              --split --size=1024 --lz4
              /tf /tf_static
              /vxs/pcloud/events
              /vxs/sensor/camera_info
+             /imu
            "/>
 </launch>

@@ -1,0 +1,74 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Record VXS events + VN-100 IMU for offline LI-Init calibration.
+       Use on_time < period_time for clean windowed point clouds.
+       Recommended: on_time:=100 period_time:=200 -->
+  <arg name="port"        default="/dev/ttyUSB0"/>
+  <arg name="baud_rate"   default="921600"/>
+  <arg name="imu_frame"   default="IMU"/>
+  <arg name="on_time"     default="100"/>
+  <arg name="period_time" default="200"/>
+  <arg name="bag_path"    default="/home/vxs/vxs_ws/catkin_ws/src/vxs_sensor_ros1/record/vxs_li_init_calib.bag"/>
+  <arg name="duration_sec" default="1800"/>
+  <arg name="start_delay"  default="20"/>
+  <arg name="use_rviz"     default="true"/>
+  <arg name="rviz_config"  default="$(find vxs_sensor_ros1)/config/vxs_rviz.rviz"/>
+
+  <!-- CAD-derived initial guess: T_LI = T_(ROS LiDAR frame -> IMU).
+       These values are recorded into /tf_static together with the bag. -->
+  <arg name="imu_tx"    default="-0.06310"/>
+  <arg name="imu_ty"    default="-0.04534"/>
+  <arg name="imu_tz"    default="-0.04282"/>
+  <arg name="imu_roll"  default="3.141593"/>
+  <arg name="imu_pitch" default="0.0"/>
+  <arg name="imu_yaw"   default="-1.570796"/>
+
+  <!-- VN-100 IMU -->
+  <include file="$(find vectornav_driver)/launch/vectornav_driver_ros1.launch">
+    <arg name="port"      value="$(arg port)"/>
+    <arg name="baud_rate" value="$(arg baud_rate)"/>
+    <arg name="frame_id"  value="$(arg imu_frame)"/>
+    <arg name="respawn"   value="false"/>
+  </include>
+
+  <!-- VoxelSensor in events (streaming) mode -->
+  <node pkg="vxs_sensor_ros1" type="vxs_node" name="vxs_node" output="screen">
+    <param name="config_json" value="$(find vxs_sensor_ros1)/config/and2_median_golden.json"/>
+    <param name="calib_json"  value="$(find vxs_sensor_ros1)/config/calib_07_04_8mm.json"/>
+    <param name="fps"                      type="int"    value="33"/>
+    <!-- Using FPS=33 as requested -->
+    <param name="publish_depth_image"      type="bool"   value="false"/>
+    <param name="publish_pointcloud"       type="bool"   value="false"/>
+    <param name="publish_events"           type="bool"   value="true"/>
+    <!-- Observation window set at startup (before polling thread) to avoid SDK crash -->
+    <param name="on_time"                  type="int"    value="$(arg on_time)"/>
+    <param name="period_time"              type="int"    value="$(arg period_time)"/>
+    <param name="binning_amount"           type="int"    value="0"/>
+    <param name="prefiltering_threshold"   type="double" value="2.0"/>
+    <param name="filterP1"                 type="double" value="0.1"/>
+    <param name="temporal_threshold"       type="int"    value="4"/>
+    <param name="spatial_threshold"        type="int"    value="10"/>
+    <remap from="~pcloud/events"       to="/vxs/pcloud/events"/>
+    <remap from="~sensor/camera_info"  to="/vxs/sensor/camera_info"/>
+  </node>
+
+  <!-- Static TFs for RViz and recorded bag -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="camera_link_to_sensor"
+        args="0 0 0 0.5 -0.5 0.5 -0.5 camera_link sensor"/>
+  <node pkg="tf2_ros" type="static_transform_publisher" name="sensor_to_imu"
+        args="$(arg imu_tx) $(arg imu_ty) $(arg imu_tz) $(arg imu_roll) $(arg imu_pitch) $(arg imu_yaw) sensor $(arg imu_frame)"/>
+
+  <!-- Optional RViz -->
+  <node if="$(arg use_rviz)" pkg="rviz" type="rviz" name="rviz"
+        args="-d $(arg rviz_config)"/>
+
+  <!-- Record events + IMU + TF (with configurable start delay) -->
+  <node name="rosbag_record" pkg="rosbag" type="record" output="screen"
+        launch-prefix="$(find vxs_sensor_ros1)/scripts/delayed_start.sh $(arg start_delay)"
+        args="-O $(arg bag_path)
+              --duration=$(arg duration_sec)
+              /tf /tf_static
+              /vxs/pcloud/events
+              /vectornav/imu/data
+              /vxs/sensor/camera_info"/>
+</launch>

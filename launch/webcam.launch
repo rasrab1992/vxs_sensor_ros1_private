@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="device"     default="/dev/video0"/>
+  <arg name="width"      default="640"/>
+  <arg name="height"     default="480"/>
+  <arg name="framerate"  default="30"/>
+  <arg name="frame_id"   default="camera"/>
+
+  <node pkg="usb_cam" type="usb_cam_node" name="webcam" output="screen">
+    <param name="video_device"    value="$(arg device)"/>
+    <param name="image_width"     value="$(arg width)"/>
+    <param name="image_height"    value="$(arg height)"/>
+    <param name="pixel_format"    value="yuyv"/>
+    <param name="camera_frame_id" value="$(arg frame_id)"/>
+    <param name="io_method"       value="mmap"/>
+    <param name="framerate"       value="$(arg framerate)"/>
+    <param name="camera_name"     value="webcam"/>
+    <remap from="webcam/image_raw"    to="/camera/image_raw"/>
+    <remap from="webcam/camera_info"  to="/camera/camera_info"/>
+  </node>
+
+  <!-- Compress image for efficient transport over WiFi to remote RViz -->
+  <node pkg="image_transport" type="republish" name="image_compress"
+        args="raw in:=/camera/image_raw compressed out:=/camera/image_raw"/>
+</launch>

@@ -1,0 +1,198 @@
+
+# ============================================================
+# IMX219 Camera → ROS Publisher
+# Device:  Seeed reComputer J401 (Jetson Orin NX 16G)
+#          L4T 35.5.0 / JetPack 5.1.3, ROS1 Noetic in Docker
+# Result:  /camera/image_raw at ~9.9 Hz, continuous, stable
+# Updated: 2026-05-12
+# ============================================================
+
+## Hardware Notes
+- Camera: IMX219 connected to CAM0 port (15-pin CSI, gold fingers facing DOWN)
+- Argus assigns sensor-id=0 to the only connected camera regardless of physical port
+- Stable sensor mode: sensor-mode=2 (1920×1080 @ 30fps), scaled to 1280×720 in NVMM
+- sensor-mode=4 (1280×720 @ 60fps): caused ISP IVC channel crashes on JP5.1.3
+  on some boots due to SCF/FusaCaptureViCsiHw kernel bug — use mode=2
+
+## Alternative Camera Recommendation
+If Argus continues to be unstable, use USB camera instead:
+  Arducam OV2311 Global Shutter USB (1600×1200, monochrome, UVC)
+  - No Argus, no nvargus-daemon, no ISP IVC involved — pure V4L2
+  - Global shutter eliminates rolling-shutter distortion during calibration motion
+  - ROS: ros-noetic-usb-cam, pixel_format: grey
+  See Section 6 for USB camera setup.
+
+## Problem 1: Argus TIMEOUT / "No cameras available"
+
+### Root cause A — ghost second sensor (~5.5s TIMEOUT)
+"Camera IMX219 Dual" DTB makes Argus wait for TWO sensors. The second sensor
+(module1) is a ghost — never delivers frames. After ~330 frames Argus times out.
+
+Fix: patch module1 in tegra-camera-platform only (see DTB Patch Steps below).
+
+### Root cause B — ISP IVC channel crash (kernel bug, JP5.1.3)
+`tegra_capture_ivc_register_control_cb` WARN_ON fires when RTCPU HSP mailbox
+is not initialized. Symptom: "tegra194-isp5: failed to register control callback"
+in dmesg, nvargus-daemon SEGVs on every connection.
+Only a full reboot clears it — systemctl restart nvargus-daemon is insufficient.
+
+WARNING: Do NOT disable rbpcv2_imx219_c@10 sensor node in DTB.
+Doing so breaks the RTCPU HSP IVC channel entirely, causing permanent
+"no cameras available" across reboots. The module1 patch is the correct fix.
+If the sensor node was accidentally disabled, restore from backup:
+  sudo cp /boot/*.dtb.bak_* /boot/kernel_tegra234-p3767-0000-p3509-a02-user-custom.dtb
+  sudo reboot
+
+### DTB Patch Steps — disable module1 only (run once, survives reboot)
+1. Configure "Camera IMX219 Dual" via jetson-io.py:
+   sudo /opt/nvidia/jetson-io/jetson-io.py
+   → select "Camera IMX219 Dual" → save and exit (do NOT reboot yet)
+
+2. Decompile the new DTB:
+   sudo dtc -I dtb -O dts \
+     /boot/kernel_tegra234-p3767-0000-p3509-a02-user-custom.dtb \
+     -o /tmp/custom.dts 2>/dev/null
+
+3. Patch: disable module1 in tegra-camera-platform (Python one-liner):
+   python3 - <<'EOF'
+   import re
+   dts = open('/tmp/custom.dts').read()
+   # Find the tegra-camera-platform modules block and disable module1
+   def disable_module1(text):
+       result, depth, in_tcp, in_modules, in_m1, m1_depth = [], 0, False, False, False, 0
+       for line in text.splitlines(keepends=True):
+           s = line.strip()
+           if 'tegra-camera-platform' in s: in_tcp = True
+           if in_tcp and 'modules {' in s: in_modules = True
+           if in_modules and re.match(r'\s*module1\s*\{', line): in_m1, m1_depth = True, depth
+           if in_m1 and 'status' in s:
+               line = re.sub(r'status\s*=\s*"[^"]*"', 'status = "disabled"', line)
+           depth += line.count('{') - line.count('}')
+           if in_m1 and depth <= m1_depth and '}' in s: in_m1 = False
+           result.append(line)
+       return ''.join(result)
+   open('/tmp/patched.dts', 'w').write(disable_module1(dts))
+   print("Done")
+   EOF
+
+4. Recompile and install:
+   sudo dtc -I dts -O dtb /tmp/patched.dts \
+     -o /boot/kernel_tegra234-p3767-0000-p3509-a02-user-custom.dtb 2>/dev/null
+   sudo reboot
+
+5. Verify after reboot:
+   cat /proc/device-tree/tegra-camera-platform/modules/module1/status
+   # Must print: disabled
+
+## Problem 2: GStreamer pipeline EOS / instability
+- videorate + any downstream element except fakesink sends clean EOS at 6–26s
+- Python gi (appsink) causes "NvBufSurfaceFromFd Failed" — NVMM DMA fd
+  corruption when Python's GC interacts with native NVMM buffer lifecycle
+- Pipelines without videorate exhaust GPU resources and stop after seconds
+
+Fix: use videorate + fakesink (the only stable combo) and attach Python
+via fakesink's signal-handoffs=true. The buffer arriving at fakesink is
+system-memory I420 (nvvidconv converted from NVMM), so no DMA-fd issues.
+
+## Final Working GStreamer Pipeline (sensor-mode=2)
+nvarguscamerasrc sensor-id=0 sensor-mode=2
+! video/x-raw(memory:NVMM),width=1920,height=1080,format=NV12,framerate=30/1
+! nvvidconv
+! video/x-raw(memory:NVMM),width=1280,height=720,format=NV12
+! nvvidconv
+! video/x-raw,format=I420
+! queue leaky=1 max-size-buffers=4
+! videorate
+! video/x-raw,framerate=10/1
+! fakesink name=fsink sync=false signal-handoffs=true
+
+- Scale 1920×1080→1280×720 in NVMM (first nvvidconv) to avoid overwhelming
+  the GPU→CPU memcpy path; second nvvidconv copies to system RAM as I420
+- Python receives system-memory I420 via fakesink handoff — no DMA-fd issues
+- JPEG quality=85: ~9.9 Hz on ARM64. quality=95 → ~4 Hz (too slow)
+
+## Publisher Script
+scripts/imx219_publisher.py
+
+Features:
+- Publishes /camera/image_raw (sensor_msgs/Image, bgr8, 1280×720)
+- Publishes /camera/image_raw/compressed (sensor_msgs/CompressedImage, jpeg)
+- Publishes /camera/camera_info (loads from calibration/imx219_camera_info.yaml)
+- Auto-restarts nvargus-daemon + re-execs process on TIMEOUT via os.execv()
+  (in-process pipeline restart is not enough — libargus holds stale socket)
+- Requires: sudo NOPASSWD for /bin/systemctl restart nvargus-daemon
+
+## Sudoers Rule (run once)
+echo "etro ALL=(ALL) NOPASSWD: /bin/systemctl restart nvargus-daemon" | \
+  sudo tee /etc/sudoers.d/nvargus-restart
+
+## How to Run
+# Terminal 1
+source /opt/ros/noetic/setup.bash
+roscore
+
+# Terminal 2
+source /opt/ros/noetic/setup.bash
+python3 /home/etro/vxs_ws/catkin_ws/src/vxs_sensor_ros1/scripts/imx219_publisher.py
+
+# Verify rate
+rostopic hz /camera/image_raw/compressed    # expect ~9.9 Hz
+
+## Daemon Recovery (if pipeline fails without auto-restart)
+sudo systemctl restart nvargus-daemon && sleep 5
+# If "isp capture setup ioctl failed: 19" appears in journalctl:
+sudo reboot   # kernel ISP module is wedged, only reboot clears it
+
+## RViz from WSL
+export ROS_MASTER_URI=http://192.168.0.182:11311
+export ROS_IP=<wsl_ip>
+source /opt/ros/noetic/setup.bash
+rviz
+# Add Image display → topic: /camera/image_raw/compressed
+
+## Workspace Note
+The devel/setup.bash symlink may point to /home/vxs/ (container path).
+On the Jetson host (etro user):
+  source /opt/ros/noetic/setup.bash   # NOT devel/setup.bash
+Inside the container (vxs user):
+  source /home/vxs/vxs_ws/catkin_ws/devel_container/setup.bash
+
+## Section 6 — USB Camera (OV2311 Global Shutter) — recommended if Argus unstable
+
+Install:
+  sudo apt-get install -y ros-noetic-usb-cam
+
+Launch:
+  rosrun usb_cam usb_cam_node \
+    _video_device:=/dev/video0 \
+    _image_width:=1280 \
+    _image_height:=960 \
+    _pixel_format:=grey \
+    _framerate:=20 \
+    _camera_name:=camera \
+    _camera_info_url:="file:///path/to/ov2311_camera_info.yaml"
+
+Calibrate intrinsics:
+  rosrun camera_calibration cameracalibrator.py \
+    --size 9x8 --square 0.05 \
+    --no-service-check \
+    image:=/usb_cam/image_raw camera:=/usb_cam
+
+Key advantage: global shutter — no rolling-shutter distortion during
+calibration motion. Kalibr assumes instantaneous frame capture, making
+global shutter cameras the correct choice.
+
+## Kalibr IMU-Camera Calibration Workflow
+See calibration/CALIBRATION_PIPELINE.md for full details.
+Summary:
+1. Mount camera + IMU rigidly together
+2. Record bag: scripts/start_kalibr_bag_session.sh
+   Topics: /camera/image_raw + /vectornav/imu/data
+3. Run Kalibr in ARM64 Docker:
+   kalibr_calibrate_imu_camera \
+     --bag record/cam_imu_calib_vn100.bag \
+     --target calibration/kalibr_target.yaml \
+     --imu calibration/kalibr_imu.yaml \
+     --cams calibration/kalibr_camera_chain.yaml
+
+

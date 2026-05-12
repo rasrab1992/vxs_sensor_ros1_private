@@ -1,0 +1,87 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Replay a recorded bag through the converter + LI-Init offline.
+       Bag must be recorded with vxs_li_init_record_events.launch
+       (fps=33 as currently configured).
+       LI-Init config: orig_odom_freq=33, data_accum_length=100 (needs ~100s of data).
+       Usage:
+         roslaunch vxs_sensor_ros1 vxs_li_init_replay.launch \
+           bag:=<path_to_bag> use_rviz:=false
+  -->
+  <arg name="bag"      default="/home/vxs/vxs_ws/catkin_ws/src/vxs_sensor_ros1/record/vxs_li_init_calib_02.bag"/>
+  <arg name="use_rviz" default="false"/>
+  <arg name="rate"     default="1.0"/>
+
+  <!-- CAD-derived initial guess: T_LI = T_(ROS LiDAR frame -> IMU).
+       These values are already expressed in the ROS LiDAR frame and are used
+       both for the static TF and as the LI-Init extrinsic seed. -->
+  <arg name="imu_tx"    default="-0.06310"/>
+  <arg name="imu_ty"    default="-0.04534"/>
+  <arg name="imu_tz"    default="-0.04282"/>
+  <arg name="imu_roll"  default="3.141593"/>
+  <arg name="imu_pitch" default="0.0"/>
+  <arg name="imu_yaw"   default="-1.570796"/>
+
+  <!-- Filtering for ICP-based LI-Init (sensor moving, scene static).
+       Turntable params (0.004m voxel, strict ROR) are for stationary sensor — not suitable here.
+       2cm voxel gives a stable density for ICP on handheld motion.
+       No min_range: keep near points, they help ICP on walls/surfaces within 2m.
+       No ROR/SOR: too aggressive for moving sensor, removes valid scene points. -->
+  <arg name="min_range"         default="0.1"/>
+  <arg name="max_range"         default="0.0"/>
+  <arg name="voxel_size"        default="0.02"/>
+  <arg name="ror_radius"        default="0.0"/>
+  <arg name="ror_min_neighbors" default="0"/>
+  <arg name="sor_k"             default="0"/>
+  <arg name="sor_std_ratio"     default="1.0"/>
+
+  <!-- MUST be set before any node starts so all nodes use bag /clock from the start -->
+  <param name="/use_sim_time" value="true"/>
+
+  <!-- Static TFs reproduced from recorded bag (in case bag /tf_static is missing) -->
+  <!-- camera_link -> sensor: sensor native frame (Z-fwd, X-right, Y-down) -> ROS LiDAR (X-fwd, Y-left, Z-up) -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="camera_link_to_sensor"
+        args="0 0 0 0.5 -0.5 0.5 -0.5 camera_link sensor"/>
+  <!-- sensor -> IMU: CAD-derived T_LI seed (override at command line) -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="sensor_to_imu"
+        args="$(arg imu_tx) $(arg imu_ty) $(arg imu_tz) $(arg imu_roll) $(arg imu_pitch) $(arg imu_yaw) sensor IMU"/>
+  <!-- map -> camera_link: fixed reference for RViz -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="map_to_camera_link"
+        args="0 0 0 0 0 0 1 map camera_link"/>
+
+  <!-- Converter: VXS events -> Velodyne format with per-point time offsets for LI-Init -->
+  <node pkg="vxs_sensor_ros1" type="pointcloud_events_to_velodyne.py"
+        name="vxs_events_to_velodyne" output="screen">
+    <param name="in_topic"          value="/vxs/pcloud/events"/>
+    <param name="out_topic"         value="/vxs/pcloud/events_velo"/>
+    <param name="default_intensity" value="1.0"/>
+    <param name="default_ring"      value="0"/>
+    <!-- Stage 1: range filter — remove below min_range and above max_range -->
+    <param name="min_range"         value="$(arg min_range)"/>
+    <param name="max_range"         value="$(arg max_range)"/>
+    <!-- Stage 2: voxel downsampling -->
+    <param name="voxel_size"        value="$(arg voxel_size)"/>
+    <!-- Stage 3: ROR — removes isolated noise points -->
+    <param name="ror_radius"        value="$(arg ror_radius)"/>
+    <param name="ror_min_neighbors" value="$(arg ror_min_neighbors)"/>
+    <!-- Stage 4: SOR — removes statistical outliers -->
+    <param name="sor_k"             value="$(arg sor_k)"/>
+    <param name="sor_std_ratio"     value="$(arg sor_std_ratio)"/>
+  </node>
+
+  <!-- LI-Init -->
+  <include file="$(find lidar_imu_init)/launch/vxs_sensor.launch">
+    <arg name="rviz" value="$(arg use_rviz)"/>
+    <arg name="use_extrinsic_seed" value="true"/>
+    <arg name="imu_tx" value="$(arg imu_tx)"/>
+    <arg name="imu_ty" value="$(arg imu_ty)"/>
+    <arg name="imu_tz" value="$(arg imu_tz)"/>
+    <arg name="imu_roll" value="$(arg imu_roll)"/>
+    <arg name="imu_pitch" value="$(arg imu_pitch)"/>
+    <arg name="imu_yaw" value="$(arg imu_yaw)"/>
+  </include>
+
+  <!-- Replay bag (after a short delay so LI-Init is ready) -->
+  <node name="rosbag_play" pkg="rosbag" type="play" output="screen"
+        args="--clock -r $(arg rate) --delay 3.0 $(arg bag)"/>
+</launch>

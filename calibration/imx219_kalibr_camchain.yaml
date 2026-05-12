@@ -1,0 +1,11 @@
+# Kalibr camera chain — IMX219 on Seeed J401 (sensor-mode=4, 1280x720)
+# Intrinsics from ROS cameracalibrator.py (checkerboard 9x8, 50mm squares)
+# Use this as --cams argument to kalibr_calibrate_imu_camera
+
+cam0:
+  camera_model: pinhole
+  intrinsics: [1287.5767, 1289.2858, 646.8370, 353.1004]   # fu, fv, cu, cv
+  distortion_model: radtan
+  distortion_coeffs: [0.17884, -0.32175, 0.00261, -0.00202]  # k1, k2, p1, p2
+  resolution: [1280, 720]
+  rostopic: /camera/image_raw

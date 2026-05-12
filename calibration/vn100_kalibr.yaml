@@ -1,0 +1,13 @@
+# Kalibr IMU config — VectorNav VN-100
+# Measured from 49-minute static bag: record/vn100_static_30min.bag
+# Topic: /vectornav/imu/data  |  Rate: 200 Hz  |  Duration: 2918.7s
+# Allan variance report: record/allan_output_vn100_new/allan_report.txt
+
+rostopic: /vectornav/imu/data
+update_rate: 200.0
+
+accelerometer_noise_density: 1.140e-3   # m/s²/√Hz  (mean of ax,ay,az)
+accelerometer_random_walk:   3.050e-4   # m/s³/√Hz  (bias instability)
+
+gyroscope_noise_density:     5.232e-5   # rad/s/√Hz  (mean of wx,wy,wz)
+gyroscope_random_walk:       1.850e-5   # rad/s²/√Hz (bias instability)

@@ -49,6 +49,9 @@ find_package(VXSDK REQUIRED)
 if (VXSDK_FOUND)
   list(APPEND EXT_NODE_INCLUDE_DIRS ${VXSDK_INCLUDE_DIR})
   list(APPEND OTHER_LIBS ${VXSDK_LIBRARY})
+  if (VXSDK_SERIAL_LIBRARY)
+    list(APPEND OTHER_LIBS ${VXSDK_SERIAL_LIBRARY})
+  endif()
 else()
   message("VXSDK not found!")
 endif()
@@ -108,8 +111,11 @@ add_dependencies(vxs_node
   ${catkin_EXPORTED_TARGETS}
 )
 
-# Install python script
-catkin_install_python(PROGRAMS scripts/vxs_py_subscriber.py
+# Install python scripts
+catkin_install_python(PROGRAMS
+  scripts/vxs_py_subscriber.py
+  scripts/pointcloud_xyz_to_xyzrgb.py
+  scripts/pointcloud_events_to_velodyne.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
@@ -138,4 +144,3 @@ add_dependencies(vxs_cpp_subscriber
 #  vxs_node
 #  vxs_cpp_subscriber
 #  DESTINATION lib/${PROJECT_NAME})
-

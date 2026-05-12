@@ -1,6 +1,18 @@
 # Recorded bag files and analysis output
 record/
 
-# Backup files
+# Compiled Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Build artifacts
 *.bak
 *.bak_*
+
+# Large PLY / numpy outputs from offline_quality
+offline_quality/out_*/
+offline_quality/__pycache__/
+
+# Log directories
+log/
