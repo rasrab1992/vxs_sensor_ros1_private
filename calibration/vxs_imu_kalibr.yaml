@@ -1,14 +1,24 @@
 # Kalibr IMU config — VXS built-in IIM-42652
-# Measured from 14m50s static bag (379,615 samples, 572 Hz, 0 glitches)
-# Allan variance analysis: record/allan_output_clean/allan_report.txt
+# Measured from 53m40s static bag (1,594,302 samples, 572 Hz)
+# Sensor placed away from PC on soft foam — vibration-free environment
+# Allan variance analysis: calibration/allan_vxs_imu_clean/allan_report.txt
+#
+# Per-axis ARW (rad/s/√Hz): wx=3.6e-5  wy=3.1e-5  wz=2.1e-5
+# Per-axis VRW (m/s²/√Hz):  ax=1.15e-3  ay=2.21e-3  az=1.18e-3
+#   Note: ay ~2x noisier — gravity on Y axis (X-right, Y-down, Z-forward), normal coupling
+# Bias instability: gyro=0 (no BI minimum), accel az=1.16e-3 m/s² (worst axis)
+#
+# Comparison with VN-100 (for reference):
+#   gyro_ND:  VXS=3.6e-5  VN100=5.23e-5  → VXS is better
+#   accel_ND: VXS=1.15e-3 VN100=1.14e-3  → essentially identical
 
 rostopic: /imu
 update_rate: 572.0
 
-# Accelerometer (worst-axis conservative values)
-accelerometer_noise_density: 6.357e-3   # m/s²/√Hz  (mean ax,ay,az)
-accelerometer_random_walk:   1.160e-3   # m/s³/√Hz
+# Accelerometer — worst axis (ay, gravity coupling); ax/az mean = 1.16e-3
+accelerometer_noise_density: 2.21e-3   # m/s²/√Hz  (worst axis ay; ax=1.15e-3 az=1.18e-3)
+accelerometer_random_walk:   4.0e-4    # m/s³/√Hz  (conservative above az bias instability 1.16e-3)
 
-# Gyroscope
-gyroscope_noise_density:     1.19e-4    # rad/s/√Hz  (best axis ωy; worst ωz=1.31e-4)
-gyroscope_random_walk:       1.0e-6     # rad/s²/√Hz (bias instability below floor)
+# Gyroscope — worst axis (wx)
+gyroscope_noise_density:     3.6e-5    # rad/s/√Hz  (worst axis wx; wy=3.1e-5 wz=2.1e-5)
+gyroscope_random_walk:       4.0e-6    # rad/s²/√Hz (from wz RRW=45.7 deg/h^1.5, no BI minimum)

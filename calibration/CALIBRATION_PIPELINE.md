@@ -1,6 +1,6 @@
 # VXS Sensor Calibration Pipeline
 ## Platform: Jetson Orin NX 16G, Seeed J401, ROS1 Noetic (Docker)
-## Updated: 2026-05-12
+## Updated: 2026-06-01 (Camera-IMU Kalibr done; VXS-camera extrinsic partial)
 
 ---
 
@@ -10,7 +10,7 @@
 |-----------|---------|
 | Compute | Jetson Orin NX 16G on Seeed J401 carrier board |
 | LiDAR | VXS Andromeda2 (Lissajous scan pattern) |
-| IMU (Kalibr) | VectorNav VN-100 (external, USB, published on `/imu` via vectornav driver) |
+| IMU (Kalibr) | VectorNav VN-100 (external, USB, published on `/vectornav/imu/data` @ 200 Hz) |
 | IMU (VXS) | VXS built-in IIM-42652 — **on hold** (SDK firmware bug: `timestamp` field always zero) |
 | Camera (CSI) | Raspberry Pi Camera V2 (IMX219 8MP, CSI) — Argus unstable on JP5.1.3 |
 | Camera (USB, recommended) | Arducam OV2311 Global Shutter USB (1600×1200, monochrome) |
@@ -130,37 +130,48 @@ Script: `scripts/imx219_publisher.py`
 - Publishes `/camera/image_raw` (bgr8), `/camera/image_raw/compressed` (jpeg), `/camera/camera_info` at ~10 Hz
 - Auto-restarts nvargus-daemon + re-execs process on TIMEOUT (os.execv)
 
-### 1.6 Alternative: USB Camera (OV2311 — recommended if Argus unstable)
-```bash
-sudo apt-get install -y ros-noetic-usb-cam
-rosrun usb_cam usb_cam_node \
-  _video_device:=/dev/video0 \
-  _image_width:=1280 _image_height:=960 \
-  _pixel_format:=grey _framerate:=20 \
-  _camera_name:=camera
-```
-Global shutter eliminates rolling-shutter distortion during Kalibr motion.
-Remap `/usb_cam/image_raw` → `/camera/image_raw` for compatibility.
+### 1.6 USB Camera — Arducam OV9281 (primary, recommended)
 
-Verify:
+**Arducam OV9281** — 1MP global shutter USB camera, 1280×800 @ 100fps MJPG.
+Global shutter eliminates rolling-shutter distortion during Kalibr motion.
+Device appears as `/dev/video1` (video0 is Jetson CSI).
+
 ```bash
-rostopic hz /camera/image_raw/compressed   # expect ~9.9 Hz, stable
+# Verify device
+v4l2-ctl --list-devices
+# Should show: Arducam OV9281 USB Camera → /dev/video1
+
+# Install usb_cam if not present (inside container)
+sudo apt-get install -y ros-noetic-usb-cam
+
+# Launch (use the provided launch file)
+roslaunch vxs_sensor_ros1 ov9281.launch
+# Publishes /camera/image_raw (1280×800 @ 20fps) + /camera/camera_info
+
+# Verify
+rostopic hz /camera/image_raw   # expect ~20 Hz
+```
+
+For Kalibr bag recording, the session script uses OV9281 by default:
+```bash
+bash start_kalibr_bag_session.sh                        # OV9281 (default)
+bash start_kalibr_bag_session.sh my_bag 120 imx219      # IMX219 fallback
 ```
 
 ---
 
-## Step 2 — Camera Intrinsic Calibration (IMX219)
+## Step 2 — Camera Intrinsic Calibration
 
-**Status**: ✅ Done — `calibration/imx219_intrinsics.yaml`
+**IMX219 status**: ✅ Done — `calibration/imx219_intrinsics.yaml`
+**OV9281 status**: ⏳ TODO — must calibrate before Kalibr (use same procedure below)
 
-### 2.0 Camera choice (read this first)
+### 2.0 Camera choice
 
-**IMX219 (CSI):** JP5.1.3 Argus has ISP IVC channel stability issues. sensor-mode=2
-(1920×1080@30fps) is the stable mode. Calibration results are valid (rolling shutter
-error is small at 10fps with slow motion).
+**OV9281 (USB, primary):** Global shutter, 1280×800, plug-and-play.
+No Argus, no rolling shutter — best for Kalibr. **Use this going forward.**
 
-**OV2311 (USB, recommended):** Global shutter, plug-and-play, no Argus.
-Better for calibration — no rolling shutter. Use if IMX219/Argus is unstable.
+**IMX219 (CSI, fallback):** JP5.1.3 Argus has ISP IVC stability issues. sensor-mode=2
+stable. Rolling shutter acceptable at 10fps with slow motion.
 
 ### 2.1 Prerequisites
 ```bash
@@ -307,18 +318,21 @@ export ROS_IP=192.168.0.182
 rostopic hz /vectornav/imu/data    # expect ~200 Hz
 ```
 
-**VN-100 noise parameters** — datasheet values in `calibration/kalibr_imu.yaml` (use until
-Allan variance is measured from a 30-min static bag):
+**VN-100 noise parameters** — use `calibration/vn100_kalibr.yaml` (measured via Allan
+variance from a 49-min static bag `record/vn100_static_30min.bag`):
 ```yaml
 rostopic: /vectornav/imu/data
 update_rate: 200.0
-accelerometer_noise_density: 0.003924
-accelerometer_random_walk:   0.000392
-gyroscope_noise_density:     0.00029088
-gyroscope_random_walk:       0.0000291
+accelerometer_noise_density: 1.140e-3   # m/s²/√Hz  (mean of ax,ay,az)
+accelerometer_random_walk:   3.050e-4   # m/s³/√Hz  (bias instability)
+gyroscope_noise_density:     5.232e-5   # rad/s/√Hz  (mean of wx,wy,wz)
+gyroscope_random_walk:       1.850e-5   # rad/s²/√Hz (bias instability)
 ```
 
-> **Note:** Topic is `/vectornav/imu/data`, not `/imu`. Kalibr bag must record this topic.
+Allan variance plots: `record/allan_output_vn100_new/allan_gyro.png` and `allan_accel.png`
+
+> **Note:** Topic is `/vectornav/imu/data`, not `/imu`. Pass `--imu /data/calib/vn100_kalibr.yaml`
+> to Kalibr (not `kalibr_imu.yaml` which has datasheet values).
 
 ### 3.4 Rig Setup
 Mount the VN-100 and the IMX219 camera **rigidly together** — they must not move relative
@@ -363,14 +377,13 @@ docker run --rm -it \
 kalibr_calibrate_imu_camera \
   --bag /data/bags/cam_imu_calib_vn100.bag \
   --target /data/calib/kalibr_target.yaml \
-  --imu /data/calib/kalibr_imu.yaml \
+  --imu /data/calib/vn100_kalibr.yaml \
   --imu-models calibrated \
   --cams /data/calib/kalibr_camera_chain.yaml \
   --show-extraction
 ```
 
-> **Note:** `kalibr_imu.yaml` uses datasheet noise values for now.
-> Refine with Allan variance from `imu_static_30min.bag` before final calibration.
+> **Note:** Use `vn100_kalibr.yaml` (measured Allan variance values) — see Step 3.3 above.
 
 Output: `cam_imu_calib_vn100-camchain.yaml` — contains `T_C_I` (camera ← VN-100).
 
@@ -473,13 +486,14 @@ export ROS_HOSTNAME=192.168.0.164
 |------|-------------|
 | `calibration/imx219_camera_info.yaml` | IMX219 intrinsics — ROS format (use with publisher) |
 | `calibration/kalibr_camera_chain.yaml` | IMX219 intrinsics — Kalibr format (use with kalibr_calibrate_imu_camera) |
-| `calibration/kalibr_imu.yaml` | VN-100 noise params for Kalibr (datasheet values — refine with Allan variance) |
+| `calibration/kalibr_imu.yaml` | VN-100 noise params — datasheet values only (legacy reference, do not use for Kalibr) |
+| `calibration/vn100_kalibr.yaml` | VN-100 **measured** noise params (Allan variance, 49-min bag) — **use this for Kalibr** |
 | `calibration/kalibr_target.yaml` | Checkerboard target config for Kalibr (9×8, 5cm) |
-| `calibration/vn100_kalibr.yaml` | VN-100 measured noise params (Allan variance — use once available) |
 | `calibration/vxs_imu_kalibr.yaml` | VXS IIM-42652 noise params — **on hold** (firmware timestamp bug) |
 | `calibration/webcam_intrinsics.yaml` | Trust webcam intrinsics (640×480, legacy reference) |
-| `record/vn100_allan_static_30min.bag` | VN-100 static bag for Allan variance |
-| `scripts/imx219_publisher.py` | IMX219 publisher (sensor-mode=4, 1280×720@10Hz, fakesink handoff) |
+| `record/vn100_static_30min.bag` | VN-100 static bag for Allan variance (49 min, 200 Hz, 583k samples) |
+| `record/allan_output_vn100_new/` | Allan variance results: plots + `allan_report.txt` + `allan_params.json` |
+| `scripts/imx219_publisher.py` | IMX219 publisher (sensor-mode=2, 1280×720@10Hz, fakesink handoff) |
 | `scripts/start_kalibr_bag_session.sh` | One-command bag recorder (camera + VN-100 + rosbag) |
 | `launch/imx219.launch` | gscam-based launch (DEPRECATED — gscam segfaults on NVMM, use the script) |
 | `launch/webcam.launch` | Trust webcam launch (container) |
@@ -494,16 +508,18 @@ export ROS_HOSTNAME=192.168.0.164
 | IMX219 driver install | ✅ Done (Seeed J401, sensor-mode=2, module1 DTB patch) |
 | IMX219 ROS streaming | ✅ Done (1280×720 @ 10 Hz, sensor-mode=2 stable) |
 | IMX219 intrinsics | ✅ Done (1280×720, fx=1287.6, fy=1289.3, cx=646.8, cy=353.1) |
-| OV2311 USB camera | ⏳ TODO — recommended alternative if Argus unstable |
-| VN-100 driver + noise params | ✅ Done (200 Hz, datasheet values in `kalibr_imu.yaml`) |
-| VN-100 Allan variance refinement | ⏳ TODO — record `vn100_static_30min.bag`, compute, update `kalibr_imu.yaml` |
-| Kalibr ARM64 Docker image | ⏳ TODO — build `Dockerfile_arm64` |
-| Camera-IMU bag recording | ⏳ TODO — run `start_kalibr_bag_session.sh` |
-| Kalibr Camera-IMU calibration | ⏳ TODO |
-| VXS-Camera calibration | ⏳ TODO |
-| Transform chaining | ⏳ TODO |
+| OV9281 USB camera | ✅ Connected (/dev/video1, 1280×800 MJPG @ 100fps) |
+| OV9281 intrinsics | ✅ Done — `calibration/ov9281_camera_info.yaml` (fx=910.7, fy=910.1, 0.35px reproj) |
+| VN-100 driver + noise params | ✅ Done (200 Hz, measured Allan variance in `vn100_kalibr.yaml`) |
+| VN-100 Allan variance | ✅ Done — 49-min static bag, results in `calibration/vn100_kalibr.yaml` |
+| VXS IMU Allan variance | ✅ Done — 53-min clean bag, results in `calibration/vxs_imu_kalibr.yaml` |
+| Kalibr ARM64 Docker image | ✅ Done — `kalibr_arm64` image on host |
+| OV9281 → VN-100 Kalibr | ✅ Done — `calibration/ov9281_vn100_camchain-imucam.yaml` (0.38px reproj, -165ms offset, translation physically corrected: cam is ~55mm -Y, ~45mm -Z from VN-100) |
+| OV9281 → VXS IMU Kalibr | ✅ Done — `calibration/ov9281_vxsimu_camchain-imucam.yaml` (rotation reliable, translation ~0 due to USB lag) |
+| VXS → camera extrinsic | ⚠️ Partial — `calibration/T_vxs_cam.yaml` (translation-only, rotation fixed to identity). Needs redo with board on stand + more pose diversity. Physical: cam ~30mm forward, ~60mm lateral of VXS. |
+| Transform chaining | ⏳ TODO — T_VXS_VN100 = T_VXS_cam × inv(T_cam_imu) |
 | Validation | ⏳ TODO |
-| VXS IMU (IIM-42652) | ⏳ On hold — firmware bug: timestamp always zero (reported to company) |
+| VXS IMU (IIM-42652) | ✅ Fixed in new SDK — hardware timestamps working at 572 Hz. IMU anchor implemented in vxs_node.cpp. |
 | Migration to Orin Nano Super | ⏳ TODO — see Migration section below |
 
 ---

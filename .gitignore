@@ -1,5 +1,9 @@
-# Recorded bag files and analysis output
-record/
+# Recorded bag files — exclude large bags but keep Allan variance reports/plots
+record/*.bag
+record/*/
+!record/allan_output_vn100_new/
+!record/allan_output_vn100_new/**
+!record/allan_analysis/
 
 # Compiled Python
 __pycache__/
@@ -16,3 +20,12 @@ offline_quality/__pycache__/
 
 # Log directories
 log/
+text
+
+# Calibration debug dumps and temporary files
+calibration/debug_dump/
+
+# Crash reports (keep .md summaries, ignore raw dumps)
+vxs_node_crash_report.txt
+vxs_node_crash_one_slide.md
+bug_report.txt

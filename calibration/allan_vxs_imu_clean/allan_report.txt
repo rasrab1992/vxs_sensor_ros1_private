@@ -1,0 +1,36 @@
+========================================================================
+  IMU Allan Variance Report — VXS IIM-42652
+  Bag:  vxs_imu_allan_clean.bag
+  Rate: 572 Hz    Duration: 3220.6 s
+========================================================================
+
+GYROSCOPE
+------------------------------------------------------------------------
+  Axis   ARW (deg/√h)     Bias Instab (deg/h)    RRW (deg/h^1.5)    ARW (rad/s/√Hz)
+------------------------------------------------------------------------
+  ωx     0.1227           0.0000                 21.5327            0.000036
+  ωy     0.1070           0.0000                 6.4764             0.000031
+  ωz     0.0708           0.0000                 45.6981            0.000021
+
+ACCELEROMETER
+------------------------------------------------------------------------
+  Axis   VRW (m/s/√h)     Bias Instab (m/s²)     ARW (m/s·h^-1.5)     VRW (m/s²/√Hz)
+------------------------------------------------------------------------
+  ax     0.0692           0.00035                0.000000             0.001153
+  ay     0.1326           0.00045                0.000082             0.002210
+  az     0.0705           0.00116                0.000151             0.001175
+
+RECOMMENDED KALMAN/GRAPH NOISE PARAMETERS (for YAML config)
+------------------------------------------------------------------------
+  gyroscope_noise_density:     0.000029   # rad/s/√Hz
+  gyroscope_bias_instability:  0.000000   # rad/s
+  accelerometer_noise_density: 0.001512   # m/s²/√Hz
+  accelerometer_bias_instability: 0.000656 # m/s²
+
+NOTES
+  ARW  = Angle Random Walk        (slope -1/2 on ADEV curve)
+  VRW  = Velocity Random Walk     (slope -1/2 for accel)
+  BI   = Bias Instability         (minimum of ADEV curve)
+  RRW  = Rate Random Walk         (slope +1/2 on ADEV curve)
+  For LIO-SAM/VINS use noise_density and random_walk (=bias_instability).
+========================================================================

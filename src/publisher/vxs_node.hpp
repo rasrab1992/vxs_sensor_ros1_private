@@ -128,8 +128,6 @@ namespace vxs_ros1
         std::shared_ptr<std::thread> frame_polling_thread_;
         //! RGB publishing thread
         std::shared_ptr<std::thread> rgb_publishing_thread_;
-        //! Dedicated IMU publishing thread
-        std::shared_ptr<std::thread> imu_publishing_thread_;
 
         std::shared_ptr<ros::Publisher> depth_publisher_;
         std::shared_ptr<ros::Publisher> cam_info_publisher_;
@@ -202,13 +200,6 @@ namespace vxs_ros1
         std::mutex rgb_queue_mutex_;
         std::condition_variable rgb_queue_cv_;
 
-        // IMU sample queue: polling thread enqueues, IMUPublishingLoop dequeues
-        // StampedIMUSample is defined in vxs_node.cpp (imu.hpp is not included here)
-        struct StampedIMUSample;
-        std::queue<std::shared_ptr<StampedIMUSample>> imu_queue_;
-        std::mutex imu_queue_mutex_;
-        std::condition_variable imu_queue_cv_;
-
         //! frame counter
         int frame_counter_;
 
@@ -220,6 +211,13 @@ namespace vxs_ros1
         double latest_depth_stamp_;
         //! Flag indicating that reference time is initialized
         bool flag_ref_time_initialized_;
+
+        //! IMU wall-clock anchor (set before first frame to avoid USB camera delay offset)
+        ros::Time    imu_ros_epoch_;
+        double       imu_hw_epoch_         = 0.0;
+        long long int imu_last_stamp_      = -1;
+        bool         imu_anchor_set_       = false;
+
         //! Mutex for reference time members
         std::shared_timed_mutex ref_time_mutex_;
 
@@ -245,8 +243,6 @@ namespace vxs_ros1
         void SensorPublishingLoop();
         //! Publishing loop for rgb images (as grayscale)
         void RGBPublishingLoop();
-        //! Dedicated IMU publishing loop at 572 Hz
-        void IMUPublishingLoop();
 
         //! Unpack sensor data into a cv::Mat and return 3D points
         cv::Mat UnpackFrameSensorData(float *frameXYZ, std::vector<cv::Vec3f> &points);

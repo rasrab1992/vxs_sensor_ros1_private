@@ -1,0 +1,32 @@
+T_vxs_cam:
+  comment: VXS LiDAR to camera transform (4x4, row-major)
+  rows: 4
+  cols: 4
+  data:
+  - 1.0
+  - 0.0
+  - 0.0
+  - -0.21694004
+  - 0.0
+  - 1.0
+  - 0.0
+  - -0.09021418
+  - 0.0
+  - 0.0
+  - 1.0
+  - 0.08510003
+  - 0.0
+  - 0.0
+  - 0.0
+  - 1.0
+rotation_euler_xyz_deg:
+- 0.0
+- 0.0
+- 0.0
+translation_m:
+- -0.21694
+- -0.090214
+- 0.0851
+num_poses: 46
+mean_angle_error_deg: 10.7201
+mean_dist_error_mm: 22.533

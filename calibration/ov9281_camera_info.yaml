@@ -1,0 +1,30 @@
+# OV9281 USB Global Shutter Camera — Intrinsic Calibration
+# Calibrated with ROS camera_calibration, 9x8 checkerboard, 5cm squares
+# Resolution: 1280x800
+
+image_width: 1280
+image_height: 800
+camera_name: ov9281
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [910.7206621329437, 0.0, 654.6013898298887,
+         0.0, 910.0853412963188, 403.5799581384591,
+         0.0, 0.0, 1.0]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [0.052356838080444494, -0.07392589345941432, 0.0007024000305175618, -0.0007578449002622369, 0.0]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1.0, 0.0, 0.0,
+         0.0, 1.0, 0.0,
+         0.0, 0.0, 1.0]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [917.2891845703125, 0.0, 653.3456680755626, 0.0,
+         0.0, 917.7864379882812, 403.51514579304785, 0.0,
+         0.0, 0.0, 1.0, 0.0]

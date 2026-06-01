@@ -9,14 +9,6 @@
 #include "common.hpp"
 #include "imu.hpp"
 
-namespace vxs_ros1
-{
-    struct VxsSensorPublisher::StampedIMUSample
-    {
-        imu::IMUSample sample;
-        ros::Time      stamp;
-    };
-}
 
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
@@ -141,7 +133,6 @@ namespace vxs_ros1
                                            const ros::NodeHandle &nhp) : nh_(nh),                                                //
                                                                          nhp_(nhp),                                              //
                                                                          frame_polling_thread_(nullptr),                         //
-                                                                         imu_publishing_thread_(nullptr),                        //
                                                                          flag_shutdown_request_(false),                          //
                                                                          flag_update_observation_window_(false),                 //
                                                                          flag_ref_time_initialized_(false),                      //
@@ -313,12 +304,6 @@ namespace vxs_ros1
         ROS_INFO_STREAM("Starting polling thread...");
         frame_polling_thread_ = std::make_shared<std::thread>(std::bind(&VxsSensorPublisher::SensorPollingLoop, this));
         ROS_INFO_STREAM("Done.");
-        // Start dedicated IMU publishing thread
-        imu_publishing_thread_ = nullptr;
-        if (publish_imu_)
-        {
-            imu_publishing_thread_ = std::make_shared<std::thread>(std::bind(&VxsSensorPublisher::IMUPublishingLoop, this));
-        }
     }
 
     VxsSensorPublisher::~VxsSensorPublisher()
@@ -353,14 +338,6 @@ namespace vxs_ros1
             }
         }
         rgb_publishing_thread_ = nullptr;
-
-        if (imu_publishing_thread_)
-        {
-            imu_queue_cv_.notify_all();
-            if (imu_publishing_thread_->joinable())
-                imu_publishing_thread_->join();
-        }
-        imu_publishing_thread_ = nullptr;
 
         vxsdk::vxStopSystem();
     }
@@ -480,6 +457,25 @@ namespace vxs_ros1
 
     void VxsSensorPublisher::SensorPollingLoop()
     {
+        // Anchor IMU hardware clock to wall time BEFORE blocking on the first
+        // VXS frame. The USB camera starts timestamping immediately at launch;
+        // if we wait until the first frame arrives (~150 ms later) the anchor
+        // is late by that amount, causing a large t_cam_imu offset in Kalibr.
+        if (publish_imu_)
+        {
+            int n = 0;
+            vxsdk::vxIMU *ptr = vxsdk::vxGetIMU(n);
+            if (n > 0 && ptr != nullptr)
+            {
+                double batch_span = (ptr[n-1].timestamp - ptr[0].timestamp) * PERIOD_75_MHZ;
+                imu_ros_epoch_  = ros::Time::now() - ros::Duration(batch_span);
+                imu_hw_epoch_   = ptr[0].timestamp * PERIOD_75_MHZ;
+                imu_last_stamp_ = ptr[n-1].timestamp;
+                imu_anchor_set_ = true;
+                ROS_INFO("IMU anchor set (pre-loop): %d samples, span=%.3fs", n, batch_span);
+            }
+        }
+
         int counter = 0;
         while (!flag_shutdown_request_)
         {
@@ -531,74 +527,42 @@ namespace vxs_ros1
                 frame_queue_cv_.notify_one();
             }
 
-            // Collect IMU samples and enqueue for IMUPublishingLoop.
-            // All SDK calls must happen in this thread only.
+            // Collect and publish IMU samples directly (no worker thread).
             if (publish_imu_)
             {
-                static int       last_n = 0;
-                static int       samples_per_frame_ = 0;
-                static int       frame_count = 0;
-                static ros::Time last_frame_time;
-                static bool      first_frame = true;
-
                 int num_samples = 0;
                 vxsdk::vxIMU *sample_ptr = vxsdk::vxGetIMU(num_samples);
 
-                if (first_frame)
+                if (num_samples > 0 && sample_ptr != nullptr)
                 {
-                    // First call: snapshot of backlog — record count and per-frame step
-                    last_n = num_samples;
-                    last_frame_time = frame_data.stamp;
-                    first_frame = false;
-                    ROS_INFO("IMU first batch: %d samples (backlog discarded)", num_samples);
-                }
-                else if (num_samples > 0 && sample_ptr != nullptr)
-                {
-                    ros::Time t_now = frame_data.stamp;
-                    double dt = (t_now - last_frame_time).toSec();
-                    last_frame_time = t_now;
-
-                    // How many new samples arrived this frame:
-                    // - While buffer is filling: num_samples - last_n
-                    // - Once buffer is full (num_samples == last_n == capacity):
-                    //   use the steady-state count measured during fill phase
-                    int new_count = 0;
-                    if (num_samples > last_n)
+                    if (!imu_anchor_set_)
                     {
-                        new_count = num_samples - last_n;
-                        // Only learn steady-state from frame 3+ (skip post-discard burst)
-                        if (frame_count >= 3)
-                            samples_per_frame_ = new_count;
+                        // Fallback anchor if pre-loop anchor didn't fire.
+                        double batch_span = (sample_ptr[num_samples-1].timestamp - sample_ptr[0].timestamp) * PERIOD_75_MHZ;
+                        imu_ros_epoch_  = ros::Time::now() - ros::Duration(batch_span);
+                        imu_hw_epoch_   = sample_ptr[0].timestamp * PERIOD_75_MHZ;
+                        imu_last_stamp_ = sample_ptr[num_samples - 1].timestamp;
+                        imu_anchor_set_ = true;
+                        ROS_INFO("IMU anchor set (fallback): %d samples, span=%.3fs", num_samples, batch_span);
                     }
                     else
                     {
-                        // Buffer full — use learned steady-state count
-                        new_count = (samples_per_frame_ > 0) ? samples_per_frame_ : 9;
+                        int new_count = 0;
+                        for (int i = 0; i < num_samples; i++)
+                        {
+                            if (sample_ptr[i].timestamp > imu_last_stamp_)
+                            {
+                                imu::IMUSample s(sample_ptr[i]);
+                                ros::Time stamp = imu_ros_epoch_ + ros::Duration(s.stamp_seconds - imu_hw_epoch_);
+                                PublishIMUSample(s, stamp);
+                                new_count++;
+                            }
+                        }
+                        if (new_count > 0)
+                            imu_last_stamp_ = sample_ptr[num_samples - 1].timestamp;
+
+                        ROS_INFO_THROTTLE(5.0, "IMU: buf=%d  new=%d", num_samples, new_count);
                     }
-                    last_n = num_samples;
-                    frame_count++;
-
-                    // Assign evenly-spaced timestamps over the measured interval
-                    double actual_dt = (dt > 0 && new_count > 1) ? dt / (new_count - 1) : 0.01;
-                    ros::Time t_first = t_now - ros::Duration((new_count - 1) * actual_dt);
-
-                    ROS_INFO_THROTTLE(5.0, "IMU: buf=%d  new=%d  dt=%.4fs  imu_hz=%.1f  frame=%d",
-                                      num_samples, new_count, dt, new_count / std::max(0.001, dt), frame_count);
-
-                    if (frame_count < 3) { continue; } // skip post-discard burst frames
-
-                    std::unique_lock<std::mutex> lock(imu_queue_mutex_);
-                    for (int i = 0; i < new_count; i++)
-                    {
-                        auto s = std::make_shared<StampedIMUSample>();
-                        // Take from the tail of the buffer (most recent samples)
-                        int idx = num_samples - new_count + i;
-                        s->sample = imu::IMUSample(sample_ptr[idx]);
-                        s->stamp  = t_first + ros::Duration(i * actual_dt);
-                        if (imu_queue_.size() < 2000)
-                            imu_queue_.push(s);
-                    }
-                    imu_queue_cv_.notify_all();
                 }
             }
 
@@ -759,25 +723,6 @@ namespace vxs_ros1
         }
     }
 
-    void VxsSensorPublisher::IMUPublishingLoop()
-    {
-        // Drain the IMU queue populated by SensorPollingLoop and publish each sample.
-        // All SDK calls remain in SensorPollingLoop — this thread only does ROS publish.
-        while (!flag_shutdown_request_)
-        {
-            std::shared_ptr<StampedIMUSample> entry;
-            {
-                std::unique_lock<std::mutex> lock(imu_queue_mutex_);
-                imu_queue_cv_.wait(lock, [this]
-                    { return !imu_queue_.empty() || flag_shutdown_request_; });
-                if (imu_queue_.empty())
-                    continue;
-                entry = imu_queue_.front();
-                imu_queue_.pop();
-            }
-            PublishIMUSample(entry->sample, entry->stamp);
-        }
-    }
 
     void VxsSensorPublisher::PublishGrayscaleImage(const cv::Mat &rgb_img, const ros::Time &stamp)
     {
