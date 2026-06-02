@@ -1,20 +1,27 @@
 T_vxs_cam:
-  comment: VXS LiDAR to camera transform (4x4, row-major)
+  comment: >
+    VXS LiDAR to camera transform (4x4, row-major).
+    VXS frame: X right, Y down, Z forward.
+    Camera frame: X right, Y down, Z forward (same convention).
+    Rotation: identity (camera and VXS are physically parallel).
+    Translation: physical measurement — camera is 6.5cm right (+X),
+    0.4cm above (-Y), 3cm forward (+Z) of VXS origin.
+    Plane-fitting calibration result was unreliable (see git history).
   rows: 4
   cols: 4
   data:
   - 1.0
   - 0.0
   - 0.0
-  - -0.21694004
+  - 0.065
   - 0.0
   - 1.0
   - 0.0
-  - -0.09021418
+  - -0.004
   - 0.0
   - 0.0
   - 1.0
-  - 0.08510003
+  - 0.030
   - 0.0
   - 0.0
   - 0.0
@@ -24,9 +31,8 @@ rotation_euler_xyz_deg:
 - 0.0
 - 0.0
 translation_m:
-- -0.21694
-- -0.090214
-- 0.0851
-num_poses: 46
-mean_angle_error_deg: 10.7201
-mean_dist_error_mm: 22.533
+- 0.065
+- -0.004
+- 0.030
+source: physical_measurement
+note: needs_redo_with_proper_calibration_setup
