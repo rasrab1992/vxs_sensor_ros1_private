@@ -6,11 +6,12 @@
   <arg name="on_time"     default="0"/>
   <arg name="period_time" default="0"/>
   <arg name="publish_imu" default="true"/>
+  <arg name="calib_json"  default="$(find vxs_sensor_ros1)/config/calib_noMedian_imu_03_06_2026_8mm.json"/>
 
   <!-- Your sensor node -->
   <node pkg="vxs_sensor_ros1" type="vxs_node" name="vxs_node" output="screen">
-    <param name="config_json" value="$(find vxs_sensor_ros1)/config/and2_noMedian_golden_imu_1.json"/>
-    <param name="calib_json"  value="$(find vxs_sensor_ros1)/config/calib_07_04_8mm.json"/>
+    <param name="config_json" value="$(find vxs_sensor_ros1)/config/and2_noMedian_golden.json"/>
+    <param name="calib_json"  value="$(arg calib_json)"/>
     <param name="fps" type="int" value="33"/>
     <param name="publish_depth_image" type="bool" value="false"/>
     <param name="publish_pointcloud"  type="bool" value="false"/>

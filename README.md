@@ -1,181 +1,323 @@
 # ROS1 Package for the VXS Sensor
 
-A ROS1 package for publishing sensor data in various forms (depth image, pointcloud, event stream, etc.).
+A ROS1 package for publishing sensor data from the VoxelSensors Andromeda2 sensor
+(depth image, point cloud, event stream, IMU).
 
-## Optional retrieval of docker container with ROS1 binaries and necessary depencies
+---
 
-The best way to obtain an environment that meets all depdencies folr the `vxs_sensor_ros1` package to build and run, is to directly download the pre-built docker container of an ubuntu 20.04 system with **ROS1 Noetic** installed.
+## Hardware Setup
 
-### Install docker.io
-First, install docker whether on [windows](https://docs.docker.com/desktop/setup/install/windows-install/) or [linux](https://docs.docker.com/engine/install/). In any case, it should be straightforward to do.
+| Component | Details |
+|-----------|---------|
+| Compute | Jetson Orin NX 16G (Seeed J401) — migrating to Orin Nano Super |
+| Sensor | VXS Andromeda2 (Lissajous LiDAR, USB) |
+| IMU (external) | VectorNav VN-100 (USB/FTDI, 200 Hz) |
+| Camera | IMX219 CSI (Jetson CAM1) or OV2311 USB (recommended) |
+| ROS master | `http://192.168.0.182:11311` (Jetson) |
+| Visualization | RViz on WSL: `192.168.0.164` |
 
-#### Pos-installation steps in the docker setup (Linux)
-Create a docker user,
+---
 
-``sudo groupadd docker``
+## Docker Setup
 
-and add it to to sudoers:
+### Install Docker + NVIDIA Container Toolkit
 
-``sudo usermod -aG docker $USER``
+```bash
+# Install Docker
+sudo apt-get install -y docker.io
+sudo groupadd docker
+sudo usermod -aG docker $USER
+sudo systemctl restart docker
 
-Restart the docker daemon for the changes to take effect:
+# Install NVIDIA Container Toolkit
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+  sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+  sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+  sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+sudo apt update && sudo apt-get install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+```
 
-``sudo systemctl restart docker``
+### Pull Pre-built VXS Image
 
-Finally install the nvidia container toolkit (see [here](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) ). Configure repository first:
+```bash
+# AMD64 with NVIDIA GPU
+docker pull terzakig/vxsros1:amd64
 
-``curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
-  && curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
-    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
-    sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list``
+# AMD64 without GPU
+docker pull terzakig/vxsros1:amd64_no_gpu
 
-Then, update:
+# ARM64 — Jetson (Orin NX / Orin Nano Super)
+docker pull terzakig/vxsros1:arm64
+```
 
-``sudo apt update``
+### Run the Container
 
-Finally, install the container toolkit:
+```bash
+# ARM64 (Jetson) — use the provided script
+bash docker/run_arm64.sh terzakig/vxsros1:arm64
 
-``sudo apt-get install -y nvidia-container-toolkit``
+# AMD64 with GPU
+bash docker/run.sh terzakig/vxsros1:amd64
+```
 
-### Download vxs docker image
-Now, you can download the **vxs docker image** with ros1 binaries, OpenCV, VXSDK, and other depedencies by executing on the command line,
+The script mounts:
+- `~/vxs_ws` → workspace (shared with host)
+- `~/sandbox` → scratch space
+- `/dev` → USB/device access
 
+> Create `~/vxs_ws/catkin_ws` and `~/sandbox` on the host before running if they do not exist.
 
-for an AMD system with Nvidia hardware,
+### Export Container as Image (for migration to new Jetson)
 
-``docker pull terzakig/vxs_ros1:amd64``
+```bash
+# Commit the current running container state
+docker commit agitated_mahavira vxs_ros1_noetic:backup
 
-for an AMD system **without** Nvidia hardware,
+# Save to a compressed tarball
+docker save vxs_ros1_noetic:backup | gzip > ~/vxs_ros1_noetic_backup.tar.gz
 
-``docker pull terzakig/vxsros1:amd64_no_gpu``
+# Transfer to new Jetson (SCP or USB drive)
+scp ~/vxs_ros1_noetic_backup.tar.gz <user>@<new_jetson_ip>:~/
 
-for an **nvidia/arm64** (Jetson),
+# Load on new Jetson
+docker load < ~/vxs_ros1_noetic_backup.tar.gz
+docker images   # verify image appears
 
-``docker pull terzakig/vxsros1:arm64``
+# Run on new Jetson
+bash docker/run_arm64.sh vxs_ros1_noetic:backup
+```
 
-This should take about an hour, depending on the connection. When done, verify that the docker container is there by executing,
+---
 
-``docker image list``
+## Workspace Setup (inside container)
 
-You should be able to see a container named `vxsros1` with a tag `amd64`. To run the container, use the bash script `run.sh` (or run_no_gpu.sh` if using the `amd64_no_gpu` image) provided in the `docker` directory of this repository. Use,
+```bash
+# Create workspace directories on host first (shared via volume mount)
+mkdir -p ~/vxs_ws/catkin_ws/src ~/sandbox
 
-``./run.sh terzakig/vxsros1:amd64``
+# Enter the container
+bash docker/run_arm64.sh terzakig/vxsros1:arm64
 
-for the `amd64` (with nvidia) image, or,
+# Inside container — clone the package
+cd ~/vxs_ws/catkin_ws/src
+git clone https://github.com/rasrab1992/vxs_sensor_ros1_private.git vxs_sensor_ros1
 
-``./run_no_gpu.sh terzakig/vxsros1:amd64``
+# Populate workspace with rosinstall (ARM64)
+cp vxs_sensor_ros1/rosinstall/rosinstall_arm64 ./.rosinstall
+rosinstall .
+
+# Build
+cd ~/vxs_ws/catkin_ws
+catkin build
+```
+
+> **Separate build spaces for host vs container** (avoids path conflicts):
+> - Host (`etro` user): `catkin config --build-space build_host --devel-space devel_host`
+> - Container (`vxs` user): `catkin config --build-space build_container --devel-space devel_container`
+
+---
+
+## VN-100 IMU Driver (inside container)
+
+The `ros-noetic-vectornav` apt package does not exist for arm64. Build from source:
+
+```bash
+# One-time setup
+sudo apt-get install -y libspdlog-dev
+rm ~/vxs_ws/catkin_ws/src/vectornav/CATKIN_IGNORE
+
+source /opt/ros/noetic/setup.bash
+cd ~/vxs_ws/catkin_ws
+catkin config --build-space build_container --devel-space devel_container \
+  --cmake-args -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+catkin build vectornav_driver
+
+# Run the driver
+source devel_container/setup.bash
+export ROS_MASTER_URI=http://192.168.0.182:11311
+export ROS_IP=192.168.0.182
+roslaunch vectornav_driver vectornav_driver_ros1.launch port:=/dev/ttyUSB0 baud_rate:=921600
+# Publishes /vectornav/imu/data at 200 Hz
+```
+
+Install udev rule so the device always appears at `/dev/vn100`:
+```bash
+sudo cp ~/vxs_ws/catkin_ws/src/vectornav/vectornav_driver/udev/99-vn100.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+---
+
+## IMX219 Camera Publisher (Jetson host, `etro` user)
+
+The IMX219 CSI camera runs on the **host** (not in Docker) because `nvargus-daemon`
+manages the Jetson ISP hardware.
 
-for the `amd64_no_gpu` image. For jetson please use `./run_arm64.sh terzakig/vxsros1:arm64`.
+```bash
+# Allow publisher to restart nvargus-daemon without password (run once)
+echo "etro ALL=(ALL) NOPASSWD: /bin/systemctl restart nvargus-daemon" | \
+  sudo tee /etc/sudoers.d/nvargus-restart
 
-Note that the script assumes that you have created directories `~/vxs_ws/catkin_ws`  and `~/sandbox` in the host (i.e., your machine) which will become shared between the container and the host. If these directories don't exist, the container will run anyway and it will create them on the host side as well. Not sure about this behavior in windows, as the paths are not structured the same way, but I am assuming the same will happen, just in an arbitrarry path related to the docker executable.
+# Start the publisher
+source /opt/ros/noetic/setup.bash
+export ROS_MASTER_URI=http://192.168.0.182:11311
+export ROS_IP=192.168.0.182
+python3 /home/etro/vxs_ws/catkin_ws/src/vxs_sensor_ros1/scripts/imx219_publisher.py
+# Publishes /camera/image_raw (1280×720 BGR @ 10 Hz) + /camera/camera_info
+```
+
+The publisher uses `sensor-mode=2` (1920×1080 captured, scaled to 1280×720).
+It auto-restarts `nvargus-daemon` and re-execs itself on Argus TIMEOUT.
+
+> **Orin NX only:** Requires DTB patch to disable ghost `module1`.
+> See `calibration/CALIBRATION_PIPELINE.md` Step 1 for details.
+> The Orin Nano Super (JP6.x) does not require this patch.
 
-## ROS1 Workspace setup \& Build
-
-### Setting up the workspace directories ( In the host directory)
-
-First, create the appropriate workspace directories (if not there yet; if present, skip to the next section). In the home directory of the Ubuntu host (or someplace else if on Windows), 
-
-``cd ~``
-
-Create a **sandbox** directory that will be shared netween the host and the ROS2 docker container. It will be useful for storing data.
-
-``mkdir sandbox``
-
-Now create the **vxs  workspace** directory:
-
-``mkdir vxs_ws && cd vxs_ws``
-
-Create the **ROS1 (catkin) workspace** below:
-
-``mkdir catkin_ws && cd catkin_ws``
-
-``mkdir src``
-
-### Download ROS1 Noetic packages that must be built from source, including the `vxs_sensor_ros1` package (In the container)
-
-To populate the workspace, you will need to execute a **rosinstall** script. The script is located in the `rosinstall/` directory of this repository. Thus, first clone the current repository inside `src`:
-
-``cd src``
-
-and clone,
-
-``https://github.com/rasrab1992/vxs_sensor_ros1_private.git``
-
-#### Copy appropriate rosinstall file
-
-If setting up the workspace in a **pc/amd architecture**, copy the rosinstall script from the `vxs_sensor_ros1` repository into `src` as follows:
-
-``cp vxs_sensor_ros1_private/rosinstall/rosinstall_amd64 ./.rosinstall``
-
-If setting up the workspace in an **nvidia/arm64 machine**, then copy the arm64 rosinstall script  from the `vxs_sensor_ros1` repository into `src` as follows:
-
-``cp vxs_sensor_ros1_private/rosinstall/rosinstall_arm64 ./.rosinstall``
-
-Now, execute the rosinstall 
-
-``rosinstall .``
-
-## Build the workspace
-
-Move back to the ros workspace directory, i.e., `/home/vxs/vxs_ws/catkin_ws`:
-
-``cd ..``
-
-The `rosinstall` script should have installed all repositories correctly in the `catkin_ws/src`. To build everything, execute the following inside `catkin_ws`:
-
-``catkin build``
-
-Alternatively, provided that the ROS1 packages are built, then the `vx_sensor_ros1` package can be specifically built,
-
-``catkin build vxs_sensor_ros1``
-
-## Running the node
-
-To run the `vxs_node` connect the sensor. You need to enable access to the USB:
-
-``sudo chmod -R 7777 /dev/bus/usb/``
-
-Now run the node with the following:
-
-``rosrun vxs_sensor_ros1 vxs_node _config_json:=/home/vxs/vxs_ws/ros_ws/src/vxs_sensor_ros2/config/and2_median_golden.json _calib_json:=/home/vxs/vxs_ws/ros_ws/src/vxs_sensor_ros2/config/default_calib.json _fps:=20
-
-### ROS publisher node (vxs_node) arguments
-
-- **publish_depth_image (bool)** : Will work only in **frame-based** communications mode with the sensor and publish a *depth image* in topic `depth/image`. Will be overriden (forced **false**) if **publish_events** is set to **true**.
-- **publish_pointcloud (bool)**  : Will work only in **frame-based** communications with the sensor and publish a *pointcloud* in topic `pcloud/cloud`. As above with `publish_depth_image`, it will be overriden (forced **false**) if **publish_events** is set to **true**.
-- **publish_events (bool)**      : If **publish_depth_image** or **publish_pointcloud** are not specified then setting this argument to **true** will force the node to initialize communications in **streaming mode** with the sensor. In this communications mode, the nose will publish a **stamped pointcloud** which will represent events (`XYZt`) in 3D space and time between two time instances defined by a a period `1000/fps (ms)` (see below about argument **fps**). Will override `publish_depth_image` and `publish_pointcloud`.     
-- **publish_imu**                : If set, IMU samples from the sensor will be published. The flag can be set only when using streaming mode (i.e., publish_events = true).
-- **fps (int)**                  : If using **frame-based mode** (see first two arguments), it specifies the frame-rate. For frame-based mode, then **valid fps values are 1, 15, 30, 60, 90, 180**. Otherwise, if the node is on **streaming mode**, then **fps** can have any positive value and will determine the **period throughout which it will capture events (i.e. `XYZt` data).
-- **config_json (string)**       : The full path to the SDK configuration json.
-- **calib_json (string)**        : The full path to the calibration json.
-- **sleep_time_ms (int)**        : Time to set the polling thread to sleep while waiting for a new frame/batch of events.
-- **binning_amount (int)**              : (Filtering arg. 1). Default: 0
-- **prefiltering_threshold (float)**    : (Filtering arg. 2). Default: 2.0
-- **filterP1 (float)**                  : (Filtering arg. 3). Default: 0.1
-- **temporal_threshold (int)**          : (Filtering arg. 4). Default: 4
-- **spatial_threshold (int)**           : (Filtering arg. 5). Default: 10
-
-**NOTE**: If none of the three first arguments that determine sensor communication mode are set, then the node will internally set **publish_pointcloud** to **true**.
-
-
-### Observe topics
-You can now start a new docker window and observe the data in the ros topics published by the node (`/depth/image` and `/depth/camera_info`):
-
-``rostopic list``
-
-You should see something like,
-
-![image](https://github.com/user-attachments/assets/1dd4a3a1-e3e3-4cdb-a967-a2315cd96a2e)
-
-Note that the depth image is published as a 16-bit integer image. You can display that image with,
-
-``rqt_image_view``
-
-Another way is to print the cotents of topics, e.g.,
-
-``rostopic echo /depth/camera_info``
-
-or,
-
-``rostopic echo /depth/image``
-
+---
+
+## Running the VXS Node
+
+```bash
+# USB access — one-time setup (required or LibUSB reports "no access")
+sudo usermod -aG plugdev $USER
+# Log out and back in, then verify: groups | grep plugdev
+
+# Event streaming mode (recommended)
+roslaunch vxs_sensor_ros1 vxs_events.launch publish_imu:=false
+
+# Event streaming + IMU
+roslaunch vxs_sensor_ros1 vxs_events.launch publish_imu:=true
+
+# With VN-100 external IMU
+roslaunch vxs_sensor_ros1 vxs_vn100_li_init_online.launch
+```
+
+### Node Arguments
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `publish_depth_image` | bool | false | Publish depth image (frame mode only) |
+| `publish_pointcloud` | bool | false | Publish XYZ point cloud (frame mode only) |
+| `publish_events` | bool | false | Publish XYZT event cloud (streaming mode) — overrides depth/pcloud |
+| `publish_imu` | bool | false | Publish IMU samples (streaming mode only) |
+| `fps` | int | 33 | Frame rate (streaming: event window period = 1000/fps ms) |
+| `config_json` | string | — | Full path to SDK config JSON |
+| `calib_json` | string | — | Full path to calibration JSON |
+| `binning_amount` | int | 0 | Spatial binning (0=full resolution, higher=coarser) |
+| `prefiltering_threshold` | float | 2.0 | Pre-filter threshold |
+| `filterP1` | float | 0.1 | Filter parameter P1 |
+| `temporal_threshold` | int | 4 | Temporal filter threshold |
+| `spatial_threshold` | int | 10 | Spatial filter threshold |
+| `on_time` | int | 0 | Observation window on-time in SDK ticks (0 = continuous) |
+| `period_time` | int | 0 | Observation window period in SDK ticks (0 = continuous) |
+
+### Observation Window (Point Cloud Density)
+
+The observation window controls how long the sensor actively integrates light per cycle.
+A longer `on_time` relative to `period_time` gives denser point clouds.
+
+**Recommended settings for GOLDEN mode:**
+
+| Use case | on_time | period_time | Duty cycle |
+|----------|---------|-------------|------------|
+| Continuous (default) | 0 | 0 | 100% |
+| Best density + quality | 100 | 200 | 50% |
+| Low power | 30 | 60 | 50% |
+
+> **SDK note (2026-06-03):** `vxSetObservationWindow` **must be called after `vxStartSystem`**,
+> not before. In the new SDK version (updated May 2026), calling it before `vxStartSystem`
+> is silently ignored, resulting in no effect on point cloud density. This is fixed in
+> `src/publisher/vxs_node.cpp`. The old SDK accepted both orderings.
+
+> **Point cloud units:** The VXS SDK returns coordinates in **millimeters**. The ROS node
+> converts to **meters** (`* 1e-3`) before publishing on `/vxs/pcloud/events`.
+
+> **IMU note:** The VXS built-in IIM-42652 IMU has a confirmed firmware bug —
+> `vxIMU.timestamp` is always zero on SDK 2.8 (`5-updated_sdk` branch).
+> Use the external VN-100 IMU for timestamped IMU data until the firmware is fixed.
+
+### Topics Published
+
+| Topic | Type | Mode |
+|-------|------|------|
+| `/vxs/pcloud/events` | sensor_msgs/PointCloud2 | Events (XYZT) |
+| `/vxs/sensor/camera_info` | sensor_msgs/CameraInfo | Always |
+| `/depth/image` | sensor_msgs/Image | Frame mode |
+| `/pcloud/cloud` | sensor_msgs/PointCloud2 | Frame mode |
+| `/imu` | sensor_msgs/Imu | publish_imu:=true |
+
+---
+
+## Calibration
+
+Full pipeline documented in `calibration/CALIBRATION_PIPELINE.md`.
+
+### Quick Summary
+
+1. **IMX219 intrinsics** — ✅ Done (`calibration/imx219_intrinsics.yaml`)
+2. **VN-100 Allan variance** — ✅ Done (`calibration/vn100_kalibr.yaml`, 49-min bag)
+3. **Camera-IMU (Kalibr)** — ⏳ Record bag with `scripts/start_kalibr_bag_session.sh`
+4. **VXS-Camera extrinsics** — ⏳ AprilGrid target-based
+5. **Transform chaining** — ⏳ `T_VXS_I = T_VXS_C @ T_C_I`
+
+```bash
+# One-command calibration bag recording (host, etro user)
+bash /home/etro/vxs_ws/catkin_ws/src/vxs_sensor_ros1/scripts/start_kalibr_bag_session.sh
+# Records /camera/image_raw + /vectornav/imu/data for 120s
+# Output: record/cam_imu_calib_vn100.bag
+```
+
+---
+
+## ROS Network Configuration
+
+### Jetson Container (`vxs` user)
+```bash
+export ROS_MASTER_URI=http://192.168.0.182:11311
+export ROS_IP=192.168.0.182
+export ROS_HOSTNAME=192.168.0.182
+```
+
+### Jetson Host (`etro` user)
+```bash
+export ROS_MASTER_URI=http://192.168.0.182:11311
+export ROS_IP=192.168.0.182
+export ROS_HOSTNAME=192.168.0.182
+```
+
+### WSL Laptop (`192.168.0.164`)
+```bash
+# ~/.bashrc
+export ROS_MASTER_URI=http://192.168.0.182:11311
+export ROS_IP=192.168.0.164
+export ROS_HOSTNAME=192.168.0.164
+# Requires WSL mirrored networking in C:\Users\<user>\.wslconfig:
+#   [wsl2]
+#   networkingMode=mirrored
+```
+
+---
+
+## Observe Topics
+
+```bash
+rostopic list
+rostopic hz /vxs/pcloud/events
+rostopic hz /vectornav/imu/data
+rostopic hz /camera/image_raw
+rqt_image_view   # view camera image
+```
+
+---
+
+## Key Scripts
+
+| Script | Where to run | Description |
+|--------|-------------|-------------|
+| `docker/run_arm64.sh` | Host | Start VXS Docker container (ARM64/Jetson) |
+| `scripts/imx219_publisher.py` | Host (`etro`) | IMX219 CSI camera → ROS topics |
+| `scripts/start_kalibr_bag_session.sh` | Host (`etro`) | Record Kalibr calibration bag |
+| `scripts/run_imx219.sh` | Host (`etro`) | Wrapper for imx219_publisher.py with auto-restart |

@@ -364,12 +364,6 @@ namespace vxs_ros1
         {
             init_flags = init_flags | vxsdk::vxFlag::IMU;
         }
-        // Set observation window before starting the SDK (skip if both are 0 = continuous streaming)
-        if (on_time_ > 0 && period_time_ > 0)
-        {
-            vxsdk::vxSetObservationWindow(on_time_, period_time_);
-        }
-
         // Set filtering parameters
         vxsdk::vxSetBinningAmount(filtering_params_.binning_amount);
         vxsdk::vxSetFilteringParameters(                  //
@@ -410,6 +404,14 @@ namespace vxs_ros1
             calib_json_.c_str(),            //
             init_flags,
             cam_type);
+
+        // Set observation window AFTER vxStartSystem (new SDK requires this order)
+        if (on_time_ > 0 && period_time_ > 0)
+        {
+            vxsdk::vxSetObservationWindow(on_time_, period_time_);
+            ROS_INFO("Observation window set after vxStartSystem: on_time=%d period_time=%d",
+                     on_time_, period_time_);
+        }
 
         return cam_num > 0;
     }
@@ -881,9 +883,9 @@ namespace vxs_ros1
         for (size_t i = 0; i < msg.width; ++i)
         {
             float *point = reinterpret_cast<float *>(ptr);
-            point[0] = eventsXYZT[i].x;                                                                                              // X coordinate
-            point[1] = eventsXYZT[i].y;                                                                                              // Y coordinate
-            point[2] = eventsXYZT[i].z;                                                                                              // Z coordinate
+            point[0] = eventsXYZT[i].x * 1e-3f;                                                                                      // X coordinate (mm -> m)
+            point[1] = eventsXYZT[i].y * 1e-3f;                                                                                      // Y coordinate (mm -> m)
+            point[2] = eventsXYZT[i].z * 1e-3f;                                                                                      // Z coordinate (mm -> m)
             *reinterpret_cast<double *>(ptr + t.offset) = eventsXYZT[i].timestamp * PERIOD_75_MHZ - ref_stamp + cloud_stamp.toSec(); // relative to ros message stamp
             ptr += msg.point_step;
         }
